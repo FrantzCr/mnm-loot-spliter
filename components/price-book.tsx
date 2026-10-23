@@ -8,6 +8,7 @@ import { CoinFields } from "@/components/coin-fields";
 import { ErrorCode, useI18n } from "@/components/locale";
 import type { ErrorCode as ErrorCodeName } from "@/lib/codes";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,6 +50,21 @@ type Draft = {
   priceId: string | null;
   unitCopper: number | null;
 };
+
+function matchesPriceKind(row: CatalogRow, filterKind: PriceFilter): boolean {
+  const saved = row.unitCopper != null;
+  const suggested = row.saleUnitCopper != null;
+  if (filterKind === "priced") return saved;
+  // Only real conflicts: a saved price that differs from the latest sale.
+  if (filterKind === "decision") return row.askReplace;
+  if (filterKind === "unpriced") return !saved && !suggested;
+  return true;
+}
+
+function matchesPriceSearch(row: CatalogRow, needle: string): boolean {
+  if (!needle) return true;
+  return row.itemName.toLocaleLowerCase("fr").includes(needle);
+}
 
 export function PriceBook() {
   const { copy, explain } = useI18n();
@@ -113,16 +129,15 @@ export function PriceBook() {
   }, [load]);
 
   const needle = filter.trim().toLocaleLowerCase("fr");
-  const visible = (items ?? []).filter((row) => {
-    const saved = row.unitCopper != null;
-    const suggested = row.saleUnitCopper != null;
-    if (kind === "priced" && !saved) return false;
-    // Only real conflicts: a saved price that differs from the latest sale.
-    if (kind === "decision" && !row.askReplace) return false;
-    if (kind === "unpriced" && (saved || suggested)) return false;
-    if (!needle) return true;
-    return row.itemName.toLocaleLowerCase("fr").includes(needle);
-  });
+  const catalog = items ?? [];
+  const searched = catalog.filter((row) => matchesPriceSearch(row, needle));
+  const counts: Record<PriceFilter, number> = {
+    all: searched.length,
+    priced: searched.filter((row) => matchesPriceKind(row, "priced")).length,
+    decision: searched.filter((row) => matchesPriceKind(row, "decision")).length,
+    unpriced: searched.filter((row) => matchesPriceKind(row, "unpriced")).length,
+  };
+  const visible = searched.filter((row) => matchesPriceKind(row, kind));
 
   async function addPrice() {
     setSaving(true);
@@ -338,18 +353,34 @@ export function PriceBook() {
             />
           </div>
           <div className="flex flex-wrap items-center gap-2" role="group" aria-label={copy.prices.show}>
-            {filters.map((option) => (
-              <Button
-                key={option.id}
-                type="button"
-                size="sm"
-                variant={kind === option.id ? "default" : "outline"}
-                aria-pressed={kind === option.id}
-                onClick={() => setKind(option.id)}
-              >
-                {option.label}
-              </Button>
-            ))}
+            {filters.map((option) => {
+              const selected = kind === option.id;
+              const count = counts[option.id];
+              return (
+                <Button
+                  key={option.id}
+                  type="button"
+                  size="sm"
+                  variant={selected ? "default" : "outline"}
+                  aria-pressed={selected}
+                  aria-label={`${option.label} (${count})`}
+                  className="gap-1.5"
+                  onClick={() => setKind(option.id)}
+                >
+                  {option.label}
+                  <Badge
+                    variant={selected ? "secondary" : "outline"}
+                    className={
+                      selected
+                        ? "border-transparent bg-background/20 text-primary-foreground"
+                        : "tabular-nums"
+                    }
+                  >
+                    {count}
+                  </Badge>
+                </Button>
+              );
+            })}
             <p className="text-sm text-muted-foreground">{copy.prices.shown(visible.length)}</p>
           </div>
           {visible.length === 0 ? (
