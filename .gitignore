@@ -1,0 +1,67 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+/dist/
+
+# misc
+.DS_Store
+*.pem
+.cursor/
+
+# local Cursor / agent dumps (if present)
+/agent-transcripts/
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# local SQLite (dev cwd fallback + any stray copies)
+/data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# desktop packaging (Node + Next standalone copied for Tauri)
+/desktop/.cache/
+/src-tauri/resources/register/*
+!/src-tauri/resources/register/.gitkeep
+
+# Rust / Tauri build output (also listed in src-tauri/.gitignore)
+/src-tauri/target/
+
+# research dumps
+/agent-tools/
+
+# local release binaries (uploaded via gh release, not committed)
+/release-assets/
+

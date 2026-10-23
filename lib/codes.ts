@@ -1,0 +1,79 @@
+export const ErrorCode = {
+  groupAlreadyOpen: "group.alreadyOpen",
+  groupNeedMembers: "group.needMembers",
+  groupStartBeforeSplit: "group.startBeforeSplit",
+  groupBadMode: "group.badMode",
+  groupStartBeforeJoin: "group.startBeforeJoin",
+  personMissing: "person.missing",
+  groupAlreadyPresent: "group.alreadyPresent",
+  groupNeedWho: "group.needWho",
+  groupStartBeforeLeave: "group.startBeforeLeave",
+  groupAlreadyLeft: "group.alreadyLeft",
+  groupStartBeforeSettle: "group.startBeforeSettle",
+  groupAlreadySettled: "group.alreadySettled",
+  groupStartBeforeClose: "group.startBeforeClose",
+  presenceMissing: "presence.missing",
+  pendingMissing: "pending.missing",
+  watchNeedPath: "watch.needPath",
+  watchNeedAbsolute: "watch.needAbsolute",
+  watchMissingFolder: "watch.missingFolder",
+  watchNeedDirectory: "watch.needDirectory",
+  personNeedName: "person.needName",
+  lootMissing: "loot.missing",
+  lootBadQuantity: "loot.badQuantity",
+  priceInvalid: "price.invalid",
+  itemNeedName: "item.needName",
+  priceMissing: "price.missing",
+  priceDuplicate: "price.duplicate",
+  requestFailed: "request.failed",
+  groupLoadFailed: "group.loadFailed",
+  groupStartFailed: "group.startFailed",
+  groupResetFailed: "group.resetFailed",
+  groupCloseFailed: "group.closeFailed",
+  pendingDismissFailed: "pending.dismissFailed",
+  pendingDismissAllFailed: "pending.dismissAllFailed",
+  recentPlayerDismissFailed: "recentPlayer.dismissFailed",
+  memberAddFailed: "member.addFailed",
+  leaveFailed: "leave.failed",
+  settleFailed: "settle.failed",
+  settleAllFailed: "settle.allFailed",
+  modeFailed: "mode.failed",
+  homeLoadFailed: "home.loadFailed",
+  homeSaveFailed: "home.saveFailed",
+  homeScanFailed: "home.scanFailed",
+  pricesLoadFailed: "prices.loadFailed",
+  pricesSaveFailed: "prices.saveFailed",
+  pricesDeleteFailed: "prices.deleteFailed",
+  pricesEditFailed: "prices.editFailed",
+  pricesImportFailed: "prices.importFailed",
+  priceImportEmpty: "price.importEmpty",
+  priceImportBadFile: "price.importBadFile",
+  priceImportTooLarge: "price.importTooLarge",
+  mnmdbFetchFailed: "mnmdb.fetchFailed",
+  mnmdbBadPayload: "mnmdb.badPayload",
+  mnmdbTooLarge: "mnmdb.tooLarge",
+  mnmdbEmpty: "mnmdb.empty",
+  mnmdbImportFailed: "mnmdb.importFailed",
+  personLoadFailed: "person.loadFailed",
+  personRenameFailed: "person.renameFailed",
+  personActionFailed: "person.actionFailed",
+  lootCorrectFailed: "loot.correctFailed",
+} as const;
+
+export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
+
+const NOT_FOUND = new Set<string>([
+  ErrorCode.personMissing,
+  ErrorCode.lootMissing,
+  ErrorCode.priceMissing,
+  ErrorCode.presenceMissing,
+  ErrorCode.pendingMissing,
+]);
+
+const CONFLICT = new Set<string>([ErrorCode.groupAlreadyOpen]);
+
+export function statusForCode(code: string): number {
+  if (NOT_FOUND.has(code)) return 404;
+  if (CONFLICT.has(code)) return 409;
+  return 400;
+}
