@@ -1,8 +1,17 @@
 "use client";
 
-import { BanknoteArrowDown, BanknoteArrowUp, User, X } from "lucide-react";
+import { BanknoteArrowDown, BanknoteArrowUp, ChevronDown, User, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 
 import { api } from "@/components/api";
 import { CoinAmount, CoinPhrase, COIN_SLOT, UnknownPrice } from "@/components/coin-amount";
@@ -12,7 +21,7 @@ import { ErrorCode, useI18n } from "@/components/locale";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -179,6 +188,9 @@ export function GroupScreen() {
   const [pricing, setPricing] = useState<PotLine | null>(null);
   const [priceParts, setPriceParts] = useState<CoinParts>(EMPTY_COINS);
   const [lootPersonId, setLootPersonId] = useState<string | null>(null);
+  const [membersOpen, setMembersOpen] = useState(true);
+  const [potOpen, setPotOpen] = useState(true);
+  const [pendingOpen, setPendingOpen] = useState(true);
 
   const load = useCallback(async () => {
     const token = viewGate.snapshot();
@@ -631,6 +643,9 @@ export function GroupScreen() {
   const lines = view?.lines ?? [];
   const knownValue = lines.reduce((sum, line) => sum + (line.unitCopper == null ? 0 : line.quantity * line.unitCopper), 0);
   const missing = lines.filter((line) => line.unitCopper == null).length;
+  const unpricedLootCount = lines.filter(
+    (line) => line.unitCopper == null && !isCorpseCoins(line.itemName),
+  ).length;
 
   function dismissClose() {
     if (saving) return;
@@ -707,31 +722,68 @@ export function GroupScreen() {
 
       {view ? (
         <Card>
-          <CardHeader>
-            <CardTitle as="h3">{copy.group.members}</CardTitle>
+          <CardHeader className={party ? "gap-2" : undefined}>
+            {party ? (
+              <button
+                type="button"
+                id="group-members-card-heading"
+                className="flex w-full items-start justify-between gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-[#7a4503]/40"
+                aria-expanded={membersOpen}
+                aria-controls="group-members-block"
+                aria-label={
+                  membersOpen ? copy.group.membersHideDetails : copy.group.membersShowDetails
+                }
+                onClick={() => setMembersOpen((open) => !open)}
+              >
+                <CardTitle as="h3">{copy.group.members}</CardTitle>
+                <ChevronDown
+                  className={cn(
+                    "mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform",
+                    membersOpen ? "rotate-180" : "rotate-0",
+                  )}
+                  aria-hidden
+                />
+              </button>
+            ) : (
+              <CardTitle as="h3">{copy.group.members}</CardTitle>
+            )}
             <CardDescription>
               {party ? (
-                <>
-                  {copy.group.since(stamp(party.startedAt))} {copy.group.lootSummary(lines.length)}.{" "}
+                membersOpen ? (
+                  <>
+                    {copy.group.since(stamp(party.startedAt))} {copy.group.lootSummary(lines.length)}.{" "}
+                    <CoinPhrase
+                      text={copy.group.knownValue(COIN_SLOT)}
+                      amounts={[knownValue]}
+                    />
+                    {"."}
+                    {missing > 0 ? (
+                      <>
+                        <br />
+                        {copy.group.missingValue(missing)}
+                      </>
+                    ) : null}{" "}
+                    {copy.group.lateJoin}
+                  </>
+                ) : (
                   <CoinPhrase
-                    text={copy.group.knownValue(COIN_SLOT)}
+                    text={copy.group.membersCollapsedSummary(
+                      stamp(party.startedAt),
+                      lines.length,
+                      COIN_SLOT,
+                    )}
                     amounts={[knownValue]}
                   />
-                  {"."}
-                  {missing > 0 ? (
-                    <>
-                      <br />
-                      {copy.group.missingValue(missing)}
-                    </>
-                  ) : null}{" "}
-                  {copy.group.lateJoin}
-                </>
+                )
               ) : (
                 copy.group.draftHelp
               )}
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-4">
+          <CardContent
+            id={party ? "group-members-block" : undefined}
+            className="grid gap-4"
+          >
             {!party ? (
               <div className="grid gap-4 md:grid-cols-2 md:items-start md:gap-0">
                 <section className="grid min-w-0 gap-3 md:pr-6" aria-labelledby="group-machine-heading">
@@ -855,7 +907,7 @@ export function GroupScreen() {
                 </section>
               </div>
             ) : (
-              <section className="grid gap-3" aria-labelledby="group-members-list-heading">
+              <section className="grid gap-3" aria-labelledby="group-members-card-heading">
                 {(() => {
                   const active = party.presences.filter((presence) => presence.leftAt == null);
                   const departed = party.presences.filter((presence) => presence.leftAt != null);
@@ -921,6 +973,22 @@ export function GroupScreen() {
                     );
                   };
 
+                  if (!membersOpen) {
+                    if (active.length === 0) {
+                      return <p className="text-sm text-muted-foreground">{copy.group.nobody}</p>;
+                    }
+                    return (
+                      <ul className="flex flex-wrap gap-x-3 gap-y-1.5 text-sm">
+                        {active.map((presence) => (
+                          <li key={presence.id} className="inline-flex items-center gap-1.5">
+                            <User className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                            <span>{presence.name}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    );
+                  }
+
                   if (party.presences.length === 0) {
                     return <p className="text-sm text-muted-foreground">{copy.group.nobody}</p>;
                   }
@@ -953,55 +1021,59 @@ export function GroupScreen() {
                   );
                 })()}
 
-                <form
-                  className="flex flex-wrap items-end gap-2"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    if (saving || guestLabel.trim() === "") return;
-                    void addMember();
-                  }}
-                >
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="add-member">{copy.group.addMember}</Label>
-                    <GuestNameInput
-                      id="add-member"
-                      value={guestLabel}
-                      placeholder={copy.group.nameInGroup}
-                      suggestions={playerSuggestions}
-                      listLabel={copy.group.nameSuggestions}
-                      disabled={saving}
-                      onChange={onGuestNameChange}
-                      onEnterCommit={(name, personId) => {
-                        if (saving) return;
-                        void addMember({ name, personId });
+                {membersOpen ? (
+                  <>
+                    <form
+                      className="flex flex-wrap items-end gap-2"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        if (saving || guestLabel.trim() === "") return;
+                        void addMember();
                       }}
+                    >
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="add-member">{copy.group.addMember}</Label>
+                        <GuestNameInput
+                          id="add-member"
+                          value={guestLabel}
+                          placeholder={copy.group.nameInGroup}
+                          suggestions={playerSuggestions}
+                          listLabel={copy.group.nameSuggestions}
+                          disabled={saving}
+                          onChange={onGuestNameChange}
+                          onEnterCommit={(name, personId) => {
+                            if (saving) return;
+                            void addMember({ name, personId });
+                          }}
+                        />
+                      </div>
+                      <Button type="submit" variant="outline" disabled={saving || guestLabel.trim() === ""}>
+                        {copy.common.add}
+                      </Button>
+                    </form>
+                    <RecentPlayersBesideAdd
+                      players={recentToAdd}
+                      addingKey={addingKey}
+                      saving={saving}
+                      copy={copy}
+                      onAdd={(player) => void addRecentToGroup(player)}
+                      onDismiss={(player) => void dismissRecentPlayerFromList(player)}
                     />
-                  </div>
-                  <Button type="submit" variant="outline" disabled={saving || guestLabel.trim() === ""}>
-                    {copy.common.add}
-                  </Button>
-                </form>
-                <RecentPlayersBesideAdd
-                  players={recentToAdd}
-                  addingKey={addingKey}
-                  saving={saving}
-                  copy={copy}
-                  onAdd={(player) => void addRecentToGroup(player)}
-                  onDismiss={(player) => void dismissRecentPlayerFromList(player)}
-                />
 
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    disabled={saving}
-                    onClick={() => setCloseOpen(true)}
-                  >
-                    {copy.group.close}
-                  </Button>
-                  <Button type="button" variant="destructive" disabled={saving} onClick={() => setResetOpen(true)}>
-                    {copy.group.reset}
-                  </Button>
-                </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => setCloseOpen(true)}
+                      >
+                        {copy.group.close}
+                      </Button>
+                      <Button type="button" variant="destructive" disabled={saving} onClick={() => setResetOpen(true)}>
+                        {copy.group.reset}
+                      </Button>
+                    </div>
+                  </>
+                ) : null}
               </section>
             )}
           </CardContent>
@@ -1010,11 +1082,36 @@ export function GroupScreen() {
 
       {party ? (
         <Card>
-          <CardHeader>
-            <CardTitle as="h3">{copy.group.pot}</CardTitle>
-            <CardDescription>{copy.group.potHelp}</CardDescription>
-          </CardHeader>
-          <CardContent className={lines.length === 0 ? undefined : "grid gap-3"}>
+          <CollapsibleCardHeader
+            headingId="group-pot-heading"
+            panelId="group-pot-block"
+            title={copy.group.pot}
+            open={potOpen}
+            onToggle={() => setPotOpen((open) => !open)}
+            showLabel={copy.group.collapseShow}
+            hideLabel={copy.group.collapseHide}
+            openDescription={copy.group.potHelp}
+            closedDescription={
+              lines.length === 0 ? (
+                copy.group.potEmpty
+              ) : (
+                <>
+                  <CoinPhrase
+                    text={copy.group.potCollapsedSummary(lines.length, COIN_SLOT)}
+                    amounts={[knownValue]}
+                  />
+                  {unpricedLootCount > 0 ? (
+                    <>
+                      {" · "}
+                      {copy.group.potCollapsedUnpriced(unpricedLootCount)}
+                    </>
+                  ) : null}
+                </>
+              )
+            }
+          />
+          {potOpen ? (
+          <CardContent id="group-pot-block" className={lines.length === 0 ? undefined : "grid gap-3"}>
             {lines.length === 0 ? (
               <p className="text-sm text-muted-foreground">{copy.group.potEmpty}</p>
             ) : (
@@ -1224,6 +1321,7 @@ export function GroupScreen() {
               </>
             )}
           </CardContent>
+          ) : null}
         </Card>
       ) : null}
 
@@ -1317,68 +1415,79 @@ export function GroupScreen() {
       </Dialog>
 
       <Card>
-        <CardHeader>
-          <CardTitle as="h3">{copy.home.pendingTitle}</CardTitle>
-          <CardDescription>{copy.home.pendingBody}</CardDescription>
-          <CardAction>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={pending.length === 0 || dismissingAll || dismissingId != null}
-              onClick={() => void dismissAllPending()}
-            >
-              {copy.home.pendingDismissAll}
-            </Button>
-          </CardAction>
-        </CardHeader>
-        <CardContent>
+        <CollapsibleCardHeader
+          headingId="group-pending-heading"
+          panelId="group-pending-block"
+          title={copy.home.pendingTitle}
+          open={pendingOpen}
+          onToggle={() => setPendingOpen((open) => !open)}
+          showLabel={copy.group.collapseShow}
+          hideLabel={copy.group.collapseHide}
+          openDescription={copy.home.pendingBody}
+          closedDescription={copy.group.pendingCollapsedSummary(pending.length)}
+        />
+        {pendingOpen ? (
+        <CardContent id="group-pending-block" className="grid gap-3">
           {pending.length === 0 ? (
             <p className="text-sm text-muted-foreground">{copy.home.pendingEmpty}</p>
           ) : (
-            <ul className="grid gap-3">
-              {pending.map((item) => (
-                <li
-                  key={item.id}
-                  className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-1 border-b border-border/60 pb-3 last:border-b-0 last:pb-0"
+            <>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={dismissingAll || dismissingId != null}
+                  onClick={() => void dismissAllPending()}
                 >
-                  <div className="min-w-0 grid gap-1">
-                    <p className="font-medium leading-snug">
-                      {item.itemName}{" "}
-                      <span className="text-muted-foreground font-normal tabular-nums">
-                        {copy.home.pendingQty(item.quantity)}
-                      </span>
-                    </p>
-                    <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
-                      {item.unitCopper == null || item.lineCopper == null ? (
-                        <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <UnknownPrice />
-                          <span className="sr-only">{copy.home.pendingUnpriced}</span>
-                        </span>
-                      ) : (
-                        <CoinPhrase
-                          text={copy.home.pendingLineCalc(item.quantity)}
-                          amounts={[item.unitCopper, item.lineCopper]}
-                          omitZeros={[true, true]}
-                        />
-                      )}
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0"
-                    disabled={dismissingAll || dismissingId === item.id}
-                    onClick={() => void dismissPending(item.id)}
+                  {copy.home.pendingDismissAll}
+                </Button>
+              </div>
+              <ul className="grid gap-3">
+                {pending.map((item) => (
+                  <li
+                    key={item.id}
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-1 border-b border-border/60 pb-3 last:border-b-0 last:pb-0"
                   >
-                    {copy.home.pendingDismiss}
-                  </Button>
-                </li>
-              ))}
-            </ul>
+                    <div className="min-w-0 grid gap-1">
+                      <p className="font-medium leading-snug">
+                        {item.itemName}{" "}
+                        <span className="text-muted-foreground font-normal tabular-nums">
+                          {copy.home.pendingQty(item.quantity)}
+                        </span>
+                      </p>
+                      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
+                        {item.unitCopper == null || item.lineCopper == null ? (
+                          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <UnknownPrice />
+                            <span className="sr-only">{copy.home.pendingUnpriced}</span>
+                          </span>
+                        ) : (
+                          <CoinPhrase
+                            text={copy.home.pendingLineCalc(item.quantity)}
+                            amounts={[item.unitCopper, item.lineCopper]}
+                            omitZeros={[true, true]}
+                          />
+                        )}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      disabled={dismissingAll || dismissingId === item.id}
+                      onClick={() => void dismissPending(item.id)}
+                    >
+                      {copy.home.pendingDismiss}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </CardContent>
+        ) : null}
       </Card>
     </div>
   );
@@ -1398,6 +1507,7 @@ function SplitResult({
   onSettleEveryone: () => void;
 }) {
   const { copy } = useI18n();
+  const [splitOpen, setSplitOpen] = useState(true);
   const members = settlementMembers(split.balances);
   const transfers = split.mode === "value" ? split.transfers : settleEveryone(members);
   const settled = split.mode === "value" ? split.settled : [];
@@ -1516,13 +1626,28 @@ function SplitResult({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle as="h3">{copy.group.valueSplit}</CardTitle>
-        <CardDescription>
-          {copy.group.valueSplitHelp} · {copy.group.history(split.headcount)}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-5">
+      <CollapsibleCardHeader
+        headingId="group-split-heading"
+        panelId="group-split-block"
+        title={copy.group.valueSplit}
+        open={splitOpen}
+        onToggle={() => setSplitOpen((open) => !open)}
+        showLabel={copy.group.collapseShow}
+        hideLabel={copy.group.collapseHide}
+        openDescription={
+          <>
+            {copy.group.valueSplitHelp} · {copy.group.history(split.headcount)}
+          </>
+        }
+        closedDescription={
+          <CoinPhrase
+            text={copy.group.valueSplitCollapsedSummary(COIN_SLOT, transfers.length)}
+            amounts={[sessionCopper]}
+          />
+        }
+      />
+      {splitOpen ? (
+      <CardContent id="group-split-block" className="grid gap-5">
         <div className="flex flex-col gap-3 rounded-sm border border-[#6e5338]/55 bg-[#f7f3ea] p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
           <div className="grid min-w-0 flex-1 gap-1.5 text-[0.9375rem] text-muted-foreground">
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
@@ -1644,7 +1769,55 @@ function SplitResult({
           </ul>
         </div>
       </CardContent>
+      ) : null}
     </Card>
+  );
+}
+
+function CollapsibleCardHeader({
+  headingId,
+  panelId,
+  title,
+  open,
+  onToggle,
+  showLabel,
+  hideLabel,
+  openDescription,
+  closedDescription,
+}: {
+  headingId: string;
+  panelId: string;
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  showLabel: string;
+  hideLabel: string;
+  openDescription?: ReactNode;
+  closedDescription?: ReactNode;
+}) {
+  const description = open ? openDescription : closedDescription;
+  return (
+    <CardHeader className="gap-2">
+      <button
+        type="button"
+        id={headingId}
+        className="flex w-full items-start justify-between gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-[#7a4503]/40"
+        aria-expanded={open}
+        aria-controls={panelId}
+        aria-label={open ? hideLabel : showLabel}
+        onClick={onToggle}
+      >
+        <CardTitle as="h3">{title}</CardTitle>
+        <ChevronDown
+          className={cn(
+            "mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform",
+            open ? "rotate-180" : "rotate-0",
+          )}
+          aria-hidden
+        />
+      </button>
+      {description != null ? <CardDescription>{description}</CardDescription> : null}
+    </CardHeader>
   );
 }
 

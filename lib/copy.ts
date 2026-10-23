@@ -118,6 +118,20 @@ const en = {
     members: "Group members",
     membersList: "In the group",
     membersLeft: "Already left",
+    membersShowDetails: "Show member details",
+    membersHideDetails: "Hide member details",
+    collapseShow: "Show details",
+    collapseHide: "Hide details",
+    /** Collapsed card line: time · loot count · coin amount slot. */
+    membersCollapsedSummary: (time: string, count: number, amount: string) =>
+      `${time} · ${count} · ${amount}`,
+    potCollapsedSummary: (count: number, amount: string) => `${count} · ${amount}`,
+    potCollapsedUnpriced: (count: number) =>
+      `${count} unpriced`,
+    valueSplitCollapsedSummary: (amount: string, transfers: number) =>
+      transfers === 0 ? `${amount} · even` : `${amount} · ${transfers} to settle`,
+    pendingCollapsedSummary: (count: number) =>
+      count === 0 ? "Nothing waiting" : `${count} waiting`,
     draftHelp:
       "Check one character on this machine, add other players by name, then start.",
     noneYet: "No members yet.",
@@ -521,6 +535,17 @@ const fr: Copy = {
     members: "Membres du groupe",
     membersList: "Dans le groupe",
     membersLeft: "Déjà partis",
+    membersShowDetails: "Afficher le détail des membres",
+    membersHideDetails: "Masquer le détail des membres",
+    collapseShow: "Afficher le détail",
+    collapseHide: "Masquer le détail",
+    membersCollapsedSummary: (time, count, amount) => `${time} · ${count} · ${amount}`,
+    potCollapsedSummary: (count, amount) => `${count} · ${amount}`,
+    potCollapsedUnpriced: (count) => `${count} sans prix`,
+    valueSplitCollapsedSummary: (amount, transfers) =>
+      transfers === 0 ? `${amount} · à égalité` : `${amount} · ${transfers} à régler`,
+    pendingCollapsedSummary: (count) =>
+      count === 0 ? "Rien en attente" : `${count} en attente`,
     draftHelp:
       "Cochez un personnage de cette machine, ajoutez les autres joueurs par leur nom, puis lancez.",
     noneYet: "Aucun membre pour l'instant.",
@@ -919,6 +944,17 @@ const es: Copy = {
     members: "Miembros del grupo",
     membersList: "En el grupo",
     membersLeft: "Ya salieron",
+    membersShowDetails: "Mostrar detalle de miembros",
+    membersHideDetails: "Ocultar detalle de miembros",
+    collapseShow: "Mostrar detalle",
+    collapseHide: "Ocultar detalle",
+    membersCollapsedSummary: (time, count, amount) => `${time} · ${count} · ${amount}`,
+    potCollapsedSummary: (count, amount) => `${count} · ${amount}`,
+    potCollapsedUnpriced: (count) => `${count} sin precio`,
+    valueSplitCollapsedSummary: (amount, transfers) =>
+      transfers === 0 ? `${amount} · equilibrado` : `${amount} · ${transfers} por saldar`,
+    pendingCollapsedSummary: (count) =>
+      count === 0 ? "Nada pendiente" : `${count} pendientes`,
     draftHelp:
       "Marca un personaje de este equipo, añade los demás jugadores por nombre y luego empieza.",
     noneYet: "Todavía no hay miembros.",

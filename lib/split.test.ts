@@ -72,7 +72,7 @@ describe("splitPot", () => {
     );
   });
 
-  it("gives the remainder copper to the earliest seats", () => {
+  it("spreads remainder copper toward the lightest fair shares", () => {
     const result = splitPot([], [], "value");
     assert.equal(result.totalCopper, 0);
     const withLoot = splitPot(
@@ -88,6 +88,37 @@ describe("splitPot", () => {
     assert.deepEqual(
       withLoot.balances.slice(0, 4).map((row) => row.shareCopper),
       [3, 3, 2, 2],
+    );
+  });
+
+  it("keeps fair shares equal when everyone joined together across many uneven lines", () => {
+    const lines = Array.from({ length: 40 }, (_, index) =>
+      line({
+        id: `g${index}`,
+        itemName: `Gemme ${index}`,
+        personName: "Aldren",
+        personId: "aldren",
+        unitCopper: 10 + (index % 7),
+      }),
+    );
+    const joined = "2026-10-22T17:00:00Z";
+    const result = splitPot(
+      lines,
+      [
+        presence("aldren", "Aldren", joined),
+        { id: "p2", personId: null, name: "Part 2", joinedAt: joined, leftAt: null },
+        { id: "p3", personId: null, name: "Part 3", joinedAt: joined, leftAt: null },
+        { id: "p4", personId: null, name: "Part 4", joinedAt: joined, leftAt: null },
+      ],
+      "value",
+    );
+    const shares = result.balances.slice(0, 4).map((row) => row.shareCopper);
+    const min = Math.min(...shares);
+    const max = Math.max(...shares);
+    assert.ok(max - min <= 1, `shares drifted too far: ${shares.join(",")}`);
+    assert.equal(
+      shares.reduce((sum, share) => sum + share, 0),
+      result.lootCopper,
     );
   });
 

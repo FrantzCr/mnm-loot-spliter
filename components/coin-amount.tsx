@@ -28,11 +28,10 @@ function CoinMark({
   paint: (typeof COIN_PAINT)[keyof typeof COIN_PAINT];
   muted?: boolean;
 }) {
-  // 1em + align-middle: sit on the same visual middle as surrounding text-sm glyphs
   return (
     <svg
       viewBox="0 0 16 16"
-      className="inline-block size-[1em] shrink-0 align-middle"
+      className="inline-block size-[1em] shrink-0"
       aria-hidden="true"
     >
       <circle
@@ -140,9 +139,8 @@ export function CoinAmount({
   return (
     <span
       className={cn(
-        // font-sans aliases the serif body face in this app; mono keeps digits clear beside coin marks.
-        // align-middle + items-center: icons (1em) and digits share the prose line middle — no floaty box.
-        "inline-flex items-center align-middle font-mono text-sm font-medium leading-none whitespace-nowrap tabular-nums",
+        // Inherit size from prose; mono keeps digits clear. Sink the whole strip to match serif prose.
+        "inline-flex translate-y-[0.12em] items-center align-baseline font-mono text-[1em] font-medium leading-none whitespace-nowrap tabular-nums",
         className,
       )}
       role="img"
@@ -164,7 +162,7 @@ export function UnknownPrice({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "inline-flex flex-nowrap items-center align-middle font-mono text-sm font-normal leading-none whitespace-nowrap text-muted-foreground tabular-nums",
+        "inline-flex translate-y-[0.12em] flex-nowrap items-center align-baseline font-mono text-[1em] font-normal leading-none whitespace-nowrap text-muted-foreground tabular-nums",
         PAIR_GAP,
         className,
       )}

@@ -254,12 +254,25 @@ function valueBalances(
     }
     if (holders.length === 0) continue;
     const base = Math.floor(value / holders.length);
-    const remainder = value % holders.length;
-    holders.forEach((presence, index) => {
+    let remainder = value % holders.length;
+    for (const presence of holders) {
       const row = rows.get(presence.id);
-      if (!row) return;
-      row.shareCopper += base + (index < remainder ? 1 : 0);
-    });
+      if (row) row.shareCopper += base;
+    }
+    // Spread leftover copper to whoever already has the least share among
+    // holders — same join window stays equal instead of always favoring seat 0.
+    while (remainder > 0) {
+      const lightest = [...holders].sort((a, b) => {
+        const shareA = rows.get(a.id)?.shareCopper ?? 0;
+        const shareB = rows.get(b.id)?.shareCopper ?? 0;
+        if (shareA !== shareB) return shareA - shareB;
+        return bySeat(a, b);
+      })[0];
+      const row = lightest ? rows.get(lightest.id) : undefined;
+      if (!row) break;
+      row.shareCopper += 1;
+      remainder -= 1;
+    }
   }
 
   const balances = [...rows.values(), ...outsiders.values()];
