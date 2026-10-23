@@ -20,7 +20,7 @@ Pre-built Windows setups are published on **this same repository**, under
 [**Releases**](https://github.com/FrantzCr/loot-spliter/releases):
 
 1. Open the latest release.
-2. Download the `.exe` (for example `MnM Loot Splitter_0.1.0_x64-setup.exe`).
+2. Download the `.exe` (for example `MnM_Loot_Splitter_0.1.0_x64-setup.exe`).
 3. Run it and install.
 
 No Node, Rust, or Visual Studio needed — just install and play.
@@ -75,6 +75,8 @@ Look for something like:
 ```text
 MnM Loot Splitter_0.1.0_x64-setup.exe
 ```
+
+(On GitHub Releases the download may appear as `MnM_Loot_Splitter_0.1.0_x64-setup.exe`.)
 
 Install that `.exe`. End users of the installed app do **not** need Node.
 
