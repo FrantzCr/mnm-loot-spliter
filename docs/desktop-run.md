@@ -32,7 +32,7 @@ Sortie typique : `src-tauri/target/release/bundle/nsis/`.
 
 Au lancement, l’exe démarre `resources/register/node.exe server.js` (`PORT=14721`, `HOSTNAME=127.0.0.1`) puis ouvre la fenêtre sur le registre. Le port **14721** est volontairement distinct de **4721** (`npm run dev`) pour ne pas afficher l’indicateur Next « N » ni se brancher sur un serveur de développement déjà ouvert. Fermer la fenêtre arrête le sidecar.
 
-SQLite reste dans `%LOCALAPPDATA%\loot-spliter\registre.sqlite` (inchangé).
+SQLite reste dans `%LOCALAPPDATA%\mnm-loot-spliter\registre.sqlite` (migration auto depuis l’ancien dossier `loot-spliter` si besoin).
 
 `npm run dev` / `npm start` écoutent aussi sur **127.0.0.1** uniquement (API sans auth — ne pas binder `0.0.0.0`).
 

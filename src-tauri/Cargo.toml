@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "MnM Loot Splitter — Monsters & Memories"
 authors = ["PandaCodes"]
 license = "MIT"
-repository = "https://github.com/FrantzCr/loot-spliter"
+repository = "https://github.com/FrantzCr/mnm-loot-spliter"
 edition = "2024"
 rust-version = "1.90"
 

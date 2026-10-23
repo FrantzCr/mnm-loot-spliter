@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "MnM Loot Splitter",
   "version": "0.1.0",
-  "identifier": "com.loot-spliter.register",
+  "identifier": "com.mnm-loot-spliter.register",
   "build": {
     "frontendDist": "../desktop/splash",
     "devUrl": "http://127.0.0.1:4721",

@@ -17,7 +17,7 @@ UI languages: **English**, **French**, and **Spanish** (Language menu).
 ## Download the installer (easiest)
 
 Pre-built Windows setups are published on **this same repository**, under
-[**Releases**](https://github.com/FrantzCr/loot-spliter/releases):
+[**Releases**](https://github.com/FrantzCr/mnm-loot-spliter/releases):
 
 1. Open the latest release.
 2. Download the `.exe` (for example `MnM_Loot_Splitter_0.1.0_x64-setup.exe`).
@@ -82,7 +82,7 @@ Install that `.exe`. End users of the installed app do **not** need Node.
 
 ### After install
 
-- App data (SQLite): `%LOCALAPPDATA%\loot-spliter\registre.sqlite`
+- App data (SQLite): `%LOCALAPPDATA%\mnm-loot-spliter\registre.sqlite`
 - Packaged app port: **14721** (local only)
 - Closing the window stops the embedded server
 
@@ -159,7 +159,7 @@ npm run tauri:dev
 | `npm run tauri:build` | Full Windows installer (see section above) |
 
 SQLite path is the same in browser/dev and packaged builds:
-`%LOCALAPPDATA%\loot-spliter\`. Nothing is prefilled.
+`%LOCALAPPDATA%\mnm-loot-spliter\`. Nothing is prefilled.
 
 ---
 

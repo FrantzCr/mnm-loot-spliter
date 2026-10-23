@@ -12,16 +12,27 @@ const globalForDb = globalThis as unknown as { registreDb?: DatabaseSync; regist
 
 const SCHEMA = 7;
 
+const APP_DATA_DIR = "mnm-loot-spliter";
+const LEGACY_APP_DATA_DIRS = ["loot-spliter"] as const;
+
 function databaseFile(): string {
-  const dir = path.join(process.env.LOCALAPPDATA || path.join(process.cwd(), "data"), "loot-spliter");
+  const root = process.env.LOCALAPPDATA || path.join(process.cwd(), "data");
+  const dir = path.join(root, APP_DATA_DIR);
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, "registre.sqlite");
-  const legacy = path.join(process.cwd(), "data", "registre.sqlite");
-  if (!fs.existsSync(file) && fs.existsSync(legacy)) {
-    fs.copyFileSync(legacy, file);
-    for (const suffix of ["-wal", "-shm"]) {
-      const from = `${legacy}${suffix}`;
-      if (fs.existsSync(from)) fs.copyFileSync(from, `${file}${suffix}`);
+  if (!fs.existsSync(file)) {
+    const candidates = [
+      ...LEGACY_APP_DATA_DIRS.map((name) => path.join(root, name, "registre.sqlite")),
+      path.join(process.cwd(), "data", "registre.sqlite"),
+    ];
+    for (const legacy of candidates) {
+      if (!fs.existsSync(legacy)) continue;
+      fs.copyFileSync(legacy, file);
+      for (const suffix of ["-wal", "-shm"]) {
+        const from = `${legacy}${suffix}`;
+        if (fs.existsSync(from)) fs.copyFileSync(from, `${file}${suffix}`);
+      }
+      break;
     }
   }
   return file;

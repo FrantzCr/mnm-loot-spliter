@@ -14,7 +14,7 @@ function dbOrDefault(db?: DatabaseSync): DatabaseSync {
   return db ?? getDb();
 }
 
-export const PRICE_BOOK_EXPORT_FORMAT = "loot-spliter-prices";
+export const PRICE_BOOK_EXPORT_FORMAT = "mnm-loot-spliter-prices";
 export const PRICE_BOOK_EXPORT_VERSION = 1;
 
 export type PriceBookEntry = {
@@ -187,7 +187,7 @@ function looksLikeSqlite(bytes: Uint8Array): boolean {
 }
 
 function readPricesFromSqlite(bytes: Uint8Array): PriceBookEntry[] {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "loot-spliter-price-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mnm-loot-spliter-price-"));
   const file = path.join(dir, "import.sqlite");
   try {
     fs.writeFileSync(file, bytes);

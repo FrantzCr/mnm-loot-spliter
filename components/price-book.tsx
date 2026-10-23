@@ -275,7 +275,7 @@ export function PriceBook() {
             onClick={() => {
               const link = document.createElement("a");
               link.href = "/api/prices/export";
-              link.download = "mnm-loot-splitter-prices.json";
+              link.download = "mnm-loot-spliter-prices.json";
               document.body.appendChild(link);
               link.click();
               link.remove();
