@@ -63,14 +63,23 @@ function parseArgs(argv) {
   return out;
 }
 
+/** Windows `shell: true` re-tokenizes the command line — quote args with spaces. */
+function winShellArg(arg) {
+  if (arg.length === 0) return '""';
+  if (!/[\s"]/.test(arg)) return arg;
+  return `"${String(arg).replaceAll('"', '""')}"`;
+}
+
 function run(command, args, { allowFail = false } = {}) {
+  const useShell = process.platform === "win32";
+  const finalArgs = useShell ? args.map(winShellArg) : args;
   console.log(`> ${command} ${args.join(" ")}`);
   try {
-    return execFileSync(command, args, {
+    return execFileSync(command, finalArgs, {
       cwd: root,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
-      shell: process.platform === "win32",
+      shell: useShell,
     }).trim();
   } catch (error) {
     if (allowFail) return "";
@@ -81,12 +90,14 @@ function run(command, args, { allowFail = false } = {}) {
 }
 
 function runInherit(command, args) {
+  const useShell = process.platform === "win32";
+  const finalArgs = useShell ? args.map(winShellArg) : args;
   console.log(`> ${command} ${args.join(" ")}`);
   try {
-    execFileSync(command, args, {
+    execFileSync(command, finalArgs, {
       cwd: root,
       stdio: "inherit",
-      shell: process.platform === "win32",
+      shell: useShell,
     });
   } catch {
     process.exit(1);

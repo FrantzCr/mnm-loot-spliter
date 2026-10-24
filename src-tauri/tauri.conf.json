@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "MnM Loot Splitter",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "identifier": "com.mnm-loot-spliter.register",
   "build": {
     "frontendDist": "../desktop/splash",
@@ -27,8 +27,12 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
-    "resources": ["resources/register/**/*"],
+    "targets": [
+      "nsis"
+    ],
+    "resources": [
+      "resources/register/**/*"
+    ],
     "shortDescription": "Local loot splitter for Monsters & Memories",
     "longDescription": "Local tool that reads Ledger files already written by the Monsters & Memories client, with no injection or memory reading.",
     "icon": [
