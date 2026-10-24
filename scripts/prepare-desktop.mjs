@@ -93,6 +93,27 @@ async function walkFiles(dir, onFile) {
   }
 }
 
+/** Repo trees that must never ship inside the packaged register runtime. */
+const BUNDLE_EXCLUDE_DIRS = [
+  "src-tauri",
+  "desktop",
+  "docs",
+  "release-assets",
+  "scripts",
+  ".git",
+  "agent-transcripts",
+];
+
+async function removeBundledJunk(dir) {
+  for (const name of BUNDLE_EXCLUDE_DIRS) {
+    const target = join(dir, name);
+    if (existsSync(target)) {
+      console.log(`Removing traced junk from register: ${name}`);
+      await rm(target, { recursive: true, force: true });
+    }
+  }
+}
+
 async function removeLocalDataArtifacts(dir) {
   await walkFiles(dir, async (file) => {
     const name = file.toLowerCase();
@@ -228,6 +249,9 @@ async function main() {
     throw new Error(`node.exe not found after extract: ${extractedNode}`);
   }
   await cp(extractedNode, join(outDir, "node.exe"));
+
+  console.log("Removing traced non-runtime trees from register bundle");
+  await removeBundledJunk(outDir);
 
   console.log("Removing local SQLite / source maps from register bundle");
   await removeLocalDataArtifacts(outDir);

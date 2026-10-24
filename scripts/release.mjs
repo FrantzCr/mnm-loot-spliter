@@ -41,8 +41,9 @@ function parseArgs(argv) {
       continue;
     }
     if (arg === "--notes") {
-      out.notes = argv[++i] ?? "";
-      continue;
+      // PowerShell/npm often strip quotes; take the rest of argv as the note.
+      out.notes = argv.slice(++i).join(" ").trim();
+      break;
     }
     if (arg.startsWith("--notes=")) {
       out.notes = arg.slice("--notes=".length);

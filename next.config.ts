@@ -3,6 +3,17 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Minimal Node server for the Tauri-packaged desktop app (no system Node required).
   output: "standalone",
+  // Keep desktop/native/build trees out of the traced standalone server.
+  outputFileTracingExcludes: {
+    "/*": [
+      "./src-tauri/**/*",
+      "./desktop/**/*",
+      "./docs/**/*",
+      "./release-assets/**/*",
+      "./scripts/**/*",
+      "./.git/**/*",
+    ],
+  },
   // Local SQLite is read on every request. Cache Components would freeze
   // those route handlers at build time.
   cacheComponents: false,
