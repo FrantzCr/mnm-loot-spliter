@@ -5,6 +5,7 @@ function stackBy<T extends { quantity: number }>(
   lines: T[],
   keyOf: (line: T) => string,
   merge: (into: T, line: T) => void,
+  seed?: (line: T) => T,
 ): T[] {
   const order: string[] = [];
   const grouped = new Map<string, T>();
@@ -12,7 +13,7 @@ function stackBy<T extends { quantity: number }>(
     const key = keyOf(line);
     const existing = grouped.get(key);
     if (!existing) {
-      grouped.set(key, { ...line });
+      grouped.set(key, seed ? seed(line) : { ...line });
       order.push(key);
       continue;
     }
@@ -63,20 +64,59 @@ export function stackLootLines(lines: PotLine[]): PotLine[] {
   );
 }
 
+/** One person's contribution inside an All-tab stacked row. */
+export type LootHolderShare = {
+  personId: string;
+  personName: string;
+  quantity: number;
+  /** Priced copper for this holder; 0 when unpriced. */
+  copper: number;
+};
+
+export type StackedAcrossPeopleLine = PotLine & {
+  holders: LootHolderShare[];
+};
+
+function holderShareFromLine(line: PotLine): LootHolderShare {
+  const pool = isPoolOnlyLine(line);
+  return {
+    personId: line.personId,
+    personName: line.personName,
+    quantity: pool ? 1 : line.quantity,
+    copper: pool ? (line.unitCopper ?? 0) : lineCopper(line),
+  };
+}
+
+function mergeHolderShare(into: StackedAcrossPeopleLine, line: PotLine) {
+  const pool = isPoolOnlyLine(line);
+  const existing = into.holders.find((holder) => holder.personId === line.personId);
+  if (existing) {
+    if (pool) {
+      existing.copper += line.unitCopper ?? 0;
+      return;
+    }
+    existing.quantity += line.quantity;
+    existing.copper += lineCopper(line);
+    return;
+  }
+  into.holders.push(holderShareFromLine(line));
+}
+
 /**
  * Display aggregation for the All loot tab.
  * Same item (+ unit price) stacks across holders; corpse coins sum into one pool row.
- * Holder names are joined when several people contributed.
+ * Holder names are joined when several people contributed; `holders` keeps each share.
  */
-export function stackLootLinesAcrossPeople(lines: PotLine[]): PotLine[] {
+export function stackLootLinesAcrossPeople(lines: PotLine[]): StackedAcrossPeopleLine[] {
   return stackBy(
-    lines,
+    lines as StackedAcrossPeopleLine[],
     (line) => {
       if (isPoolOnlyLine(line)) return itemKey(line.itemName);
       return `${itemKey(line.itemName)}\0${line.unitCopper ?? ""}`;
     },
     (into, line) => {
       mergeHolderLabel(into, line);
+      mergeHolderShare(into, line);
       if (isPoolOnlyLine(into)) {
         into.unitCopper = lineCopper(into) + lineCopper(line);
         into.quantity = 1;
@@ -84,5 +124,9 @@ export function stackLootLinesAcrossPeople(lines: PotLine[]): PotLine[] {
       }
       into.quantity += line.quantity;
     },
+    (line) => ({
+      ...line,
+      holders: [holderShareFromLine(line)],
+    }),
   );
 }

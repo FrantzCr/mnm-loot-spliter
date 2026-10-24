@@ -48,7 +48,12 @@ import {
 } from "@/lib/split";
 import { buildSettlementChatMessages } from "@/lib/settlement-chat";
 import { cn } from "cn";
-import { stackLootLines, stackLootLinesAcrossPeople } from "@/lib/stack-loot";
+import {
+  stackLootLines,
+  stackLootLinesAcrossPeople,
+  type LootHolderShare,
+  type StackedAcrossPeopleLine,
+} from "@/lib/stack-loot";
 
 type PartyPresence = {
   id: string;
@@ -683,6 +688,17 @@ export function GroupScreen() {
   const allActiveLoot = stackLootLinesAcrossPeople(
     lines.filter((line) => activeLootPersonIds.has(line.personId)),
   );
+  /** One pass — priced worth per person for compact tab labels. */
+  const lootWorthByPerson = new Map<string, number>();
+  for (const line of lines) {
+    if (line.unitCopper == null) continue;
+    const add = isCorpseCoins(line.itemName) ? line.unitCopper : line.quantity * line.unitCopper;
+    lootWorthByPerson.set(line.personId, (lootWorthByPerson.get(line.personId) ?? 0) + add);
+  }
+  let allActiveLootWorth = 0;
+  for (const personId of activeLootPersonIds) {
+    allActiveLootWorth += lootWorthByPerson.get(personId) ?? 0;
+  }
 
   function onLootTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     const count = lootTabIds.length;
@@ -1169,18 +1185,25 @@ export function GroupScreen() {
                     type="button"
                     role="tab"
                     variant={selectedLootPersonId === LOOT_TAB_ALL ? "default" : "outline"}
+                    className="gap-1.5"
                     aria-selected={selectedLootPersonId === LOOT_TAB_ALL}
                     aria-controls={lootPanelId(LOOT_TAB_ALL)}
                     tabIndex={selectedLootPersonId === LOOT_TAB_ALL ? 0 : -1}
-                    aria-label={copy.group.potTabAllHelp}
+                    aria-label={`${copy.group.potTabAllHelp}, ${coins(allActiveLootWorth)}`}
                     onClick={() => setLootPersonId(LOOT_TAB_ALL)}
                     onKeyDown={(event) => onLootTabKeyDown(event, 0)}
                   >
                     {copy.group.potTabAll}
+                    <CoinAmount
+                      copper={allActiveLootWorth}
+                      omitZeros
+                      className="text-[0.6875rem] font-normal opacity-90"
+                    />
                   </Button>
                   {lootPeople.map((person, index) => {
                     const selected = person.id === selectedLootPersonId;
                     const left = lootPersonLeftGroup(person, party);
+                    const worth = lootWorthByPerson.get(person.id) ?? 0;
                     return (
                       <Button
                         key={person.id}
@@ -1188,19 +1211,24 @@ export function GroupScreen() {
                         type="button"
                         role="tab"
                         variant={selected ? "default" : "outline"}
-                        className={left ? "opacity-55" : undefined}
+                        className={cn("gap-1.5", left ? "opacity-55" : undefined)}
                         aria-selected={selected}
                         aria-controls={lootPanelId(person.id)}
                         tabIndex={selected ? 0 : -1}
                         aria-label={
                           left
-                            ? `${copy.group.potTab(person.name)} · ${copy.group.membersLeft}`
-                            : copy.group.potTab(person.name)
+                            ? `${copy.group.potTab(person.name)} · ${copy.group.membersLeft}, ${coins(worth)}`
+                            : `${copy.group.potTab(person.name)}, ${coins(worth)}`
                         }
                         onClick={() => setLootPersonId(person.id)}
                         onKeyDown={(event) => onLootTabKeyDown(event, index + 1)}
                       >
                         {person.name}
+                        <CoinAmount
+                          copper={worth}
+                          omitZeros
+                          className="text-[0.6875rem] font-normal opacity-90"
+                        />
                       </Button>
                     );
                   })}
@@ -1217,13 +1245,16 @@ export function GroupScreen() {
                         key={`all-${line.id}`}
                         className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2"
                       >
-                        <span>
+                        <span className="min-w-0">
                           {lootLineLabel(line.itemName, copy)}
                           {line.quantity > 1 ? ` × ${line.quantity}` : ""}
-                          <span className="text-muted-foreground"> · {line.personName}</span>
+                          <span className="text-muted-foreground">
+                            {" · "}
+                            <LootHolderNames line={line} />
+                          </span>
                         </span>
                         {isCorpseCoins(line.itemName) ? (
-                          <CoinAmount copper={line.unitCopper ?? 0} />
+                          <LootLinePriceDisplay line={line} />
                         ) : (
                           <Button
                             type="button"
@@ -1239,18 +1270,7 @@ export function GroupScreen() {
                               );
                             }}
                           >
-                            {line.unitCopper == null ? (
-                              <UnknownPrice />
-                            ) : line.quantity > 1 ? (
-                              <span className="inline-flex flex-wrap items-center gap-x-1">
-                                <CoinAmount copper={line.quantity * line.unitCopper} />
-                                <span className="inline-flex items-center gap-1">
-                                  (<CoinAmount copper={line.unitCopper} omitZeros /> {copy.prices.each})
-                                </span>
-                              </span>
-                            ) : (
-                              <CoinAmount copper={line.unitCopper} />
-                            )}
+                            <LootLinePriceDisplay line={line} />
                           </Button>
                         )}
                       </li>
@@ -1282,7 +1302,7 @@ export function GroupScreen() {
                                 <span className="text-muted-foreground"> · {line.personName}</span>
                               </span>
                               {isCorpseCoins(line.itemName) ? (
-                                <CoinAmount copper={line.unitCopper ?? 0} />
+                                <LootLinePriceDisplay line={line} />
                               ) : (
                                 <Button
                                   type="button"
@@ -1298,18 +1318,7 @@ export function GroupScreen() {
                                     );
                                   }}
                                 >
-                                  {line.unitCopper == null ? (
-                                    <UnknownPrice />
-                                  ) : line.quantity > 1 ? (
-                                    <span className="inline-flex flex-wrap items-center gap-x-1">
-                                      <CoinAmount copper={line.quantity * line.unitCopper} />
-                                      <span className="inline-flex items-center gap-1">
-                                        (<CoinAmount copper={line.unitCopper} omitZeros /> {copy.prices.each})
-                                      </span>
-                                    </span>
-                                  ) : (
-                                    <CoinAmount copper={line.unitCopper} />
-                                  )}
+                                  <LootLinePriceDisplay line={line} />
                                 </Button>
                               )}
                             </li>
@@ -1681,76 +1690,77 @@ function SplitResult({
             </div>
           ) : null}
           {transfers.length > 0 ? (
-            <>
-              <ul className="grid gap-2">
-                {transfers.map((transfer) => (
-                  <li
-                    key={`${transfer.fromPresenceId}-${transfer.toPresenceId}-${transfer.copper}`}
-                    className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-sm border border-[#6e5338]/35 bg-card px-3 py-2 text-base font-medium"
-                  >
-                    <CoinPhrase text={copy.group.pays(transfer.from, COIN_SLOT, transfer.to)} amounts={[transfer.copper]} />
-                  </li>
-                ))}
-              </ul>
-              <div className="grid gap-1.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    title={chatMessages[chatPart % chatMessages.length]}
-                    onClick={() => void copyChatAnnounce()}
-                  >
-                    {chatMessages.length > 1
-                      ? `${copy.group.copyChatAnnounce} (${(chatPart % chatMessages.length) + 1}/${chatMessages.length})`
-                      : copy.group.copyChatAnnounce}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    title={gameSplitCommand}
-                    onClick={() => void copyGameSplitCommand()}
-                  >
-                    {splitCopied ? copy.common.copied : copy.group.copySplitCommand}
-                  </Button>
-                  <Button type="button" disabled={saving || split.mode !== "value"} onClick={onSettleEveryone}>
-                    {copy.group.settleEveryone}
-                  </Button>
-                </div>
-                {chatFeedback ? (
-                  <p className="text-sm text-muted-foreground" style={{ opacity: feedbackOpacity }}>
-                    {chatFeedback}
-                  </p>
+            <ul className="grid gap-2">
+              {transfers.map((transfer) => (
+                <li
+                  key={`${transfer.fromPresenceId}-${transfer.toPresenceId}-${transfer.copper}`}
+                  className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-sm border border-[#6e5338]/35 bg-card px-3 py-2 text-base font-medium"
+                >
+                  <CoinPhrase text={copy.group.pays(transfer.from, COIN_SLOT, transfer.to)} amounts={[transfer.copper]} />
+                </li>
+              ))}
+            </ul>
+          ) : everyoneEven ? (
+            <p className="text-sm text-muted-foreground">{copy.group.nothingToPay}</p>
+          ) : null}
+
+          <div className="grid gap-3 border-t border-[#6e5338]/40 pt-3">
+            <div className="grid gap-1.5">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                <p className="font-heading text-sm font-medium">{copy.group.chatAnnounceLabel}</p>
+                {chatMessages.length > 1 ? (
+                  <span className="text-xs text-muted-foreground">
+                    {copy.group.chatAnnouncePart((chatPart % chatMessages.length) + 1, chatMessages.length)}
+                  </span>
                 ) : null}
               </div>
-            </>
-          ) : (
-            <div className="grid gap-1.5">
-              {everyoneEven ? <p className="text-sm text-muted-foreground">{copy.group.nothingToPay}</p> : null}
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                <p className="min-w-0 flex-1 rounded-sm border border-[#6e5338]/35 bg-card px-2.5 py-2 font-mono text-xs leading-snug break-words text-foreground">
+                  {chatMessages[chatPart % chatMessages.length] ?? ""}
+                </p>
                 <Button
                   type="button"
                   variant="outline"
-                  title={chatMessages[0]}
+                  className="shrink-0 self-stretch sm:self-start"
+                  disabled={chatMessages.length === 0}
                   onClick={() => void copyChatAnnounce()}
                 >
                   {copy.group.copyChatAnnounce}
                 </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-1.5">
+              <p className="font-heading text-sm font-medium">{copy.group.splitCommandLabel}</p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                <p className="min-w-0 flex-1 rounded-sm border border-[#6e5338]/35 bg-card px-2.5 py-2 font-mono text-xs leading-snug text-foreground">
+                  {gameSplitCommand}
+                </p>
                 <Button
                   type="button"
                   variant="outline"
-                  title={gameSplitCommand}
+                  className="shrink-0 self-stretch sm:self-start"
                   onClick={() => void copyGameSplitCommand()}
                 >
                   {splitCopied ? copy.common.copied : copy.group.copySplitCommand}
                 </Button>
               </div>
-              {chatFeedback ? (
-                <p className="text-sm text-muted-foreground" style={{ opacity: feedbackOpacity }}>
-                  {chatFeedback}
-                </p>
-              ) : null}
             </div>
-          )}
+
+            {chatFeedback ? (
+              <p className="text-sm text-muted-foreground" style={{ opacity: feedbackOpacity }}>
+                {chatFeedback}
+              </p>
+            ) : null}
+
+            {transfers.length > 0 ? (
+              <div className="border-t border-[#6e5338]/40 pt-3">
+                <Button type="button" disabled={saving || split.mode !== "value"} onClick={onSettleEveryone}>
+                  {copy.group.settleEveryone}
+                </Button>
+              </div>
+            ) : null}
+          </div>
         </div>
 
         <div className="grid gap-2">
@@ -2060,11 +2070,65 @@ function splitCommand(copper: number): string {
   return `/split ${parts.platinum} ${parts.gold} ${parts.silver} ${parts.copper}`;
 }
 
+function lootLineTotalCopper(line: PotLine): number | null {
+  if (line.unitCopper == null) return null;
+  if (isCorpseCoins(line.itemName)) return line.unitCopper;
+  return line.quantity * line.unitCopper;
+}
+
 function lootPriceLabel(line: PotLine, copy: Copy, coins: (amount: number) => string): string {
   if (line.unitCopper == null) return copy.common.unknownPrice;
-  const unit = coins(line.unitCopper);
-  if (line.quantity > 1) return `${coins(line.quantity * line.unitCopper)} (${unit} ${copy.prices.each})`;
-  return unit;
+  const total = lootLineTotalCopper(line) ?? line.unitCopper;
+  if (line.quantity > 1 && !isCorpseCoins(line.itemName)) {
+    return `${coins(total)} (${coins(line.unitCopper)} ${copy.prices.each})`;
+  }
+  return coins(line.unitCopper);
+}
+
+/** Names on the All tab, with each holder's quantity when the row is stacked. */
+function LootHolderNames({ line }: { line: StackedAcrossPeopleLine | PotLine }) {
+  const holders: LootHolderShare[] =
+    "holders" in line && Array.isArray(line.holders) && line.holders.length > 0
+      ? line.holders
+      : [
+          {
+            personId: line.personId,
+            personName: line.personName,
+            quantity: line.quantity,
+            copper: lootLineTotalCopper(line) ?? 0,
+          },
+        ];
+  const showQty = holders.length > 1 && !isCorpseCoins(line.itemName);
+  return (
+    <>
+      {holders.map((holder, index) => (
+        <span key={holder.personId}>
+          {index > 0 ? ", " : null}
+          {holder.personName}
+          {showQty ? <span className="tabular-nums"> ×{holder.quantity}</span> : null}
+        </span>
+      ))}
+    </>
+  );
+}
+
+function LootLinePriceDisplay({ line }: { line: PotLine }) {
+  const { copy } = useI18n();
+  if (line.unitCopper == null) return <UnknownPrice />;
+  const total = lootLineTotalCopper(line) ?? line.unitCopper;
+  if (line.quantity > 1 && !isCorpseCoins(line.itemName)) {
+    return (
+      <span className="inline-flex flex-wrap items-center gap-x-1">
+        <CoinAmount copper={total} />
+        <span className="inline-flex items-center gap-1">
+          <span aria-hidden>(</span>
+          <CoinAmount copper={line.unitCopper} omitZeros />
+          <span>{copy.prices.each})</span>
+        </span>
+      </span>
+    );
+  }
+  return <CoinAmount copper={isCorpseCoins(line.itemName) ? total : line.unitCopper} />;
 }
 
 function isCorpseCoins(itemName: string): boolean {

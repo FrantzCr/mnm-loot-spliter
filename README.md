@@ -55,30 +55,40 @@ In PowerShell, from the project folder:
 npm install
 ```
 
-### 3. Build the installer
+### 3. Build the installer (local only)
 
 ```powershell
 npm run tauri:build
 ```
 
-That one command prepares the Next app, bundles Node, and builds the NSIS setup.
+That prepares the Next app, bundles Node, and builds the NSIS setup.
 The first run can take a while (downloads a portable Node zip into `desktop/.cache/`).
 
-### 4. Find the setup file
+Installer output:
 
 ```text
-src-tauri\target\release\bundle\nsis\
+src-tauri\target\release\bundle\nsis\MnM Loot Splitter_<version>_x64-setup.exe
 ```
 
-Look for something like:
+### 4. Publish a GitHub Release (one command)
 
-```text
-MnM Loot Splitter_0.1.0_x64-setup.exe
+Working tree must be clean (commit your changes first). Then from the project folder:
+
+```powershell
+npm run release -- patch
 ```
 
-(On GitHub Releases the download may appear as `MnM_Loot_Splitter_0.1.0_x64-setup.exe`.)
+Also accepted: `minor`, `major`, or an exact version (`0.1.1`).
 
-Install that `.exe`. End users of the installed app do **not** need Node.
+What it does: bump version → `tauri:build` → commit → tag → push → `gh release create` with the setup `.exe`.
+
+```powershell
+npm run release -- patch --notes "Settlement UI previews and fair-share fixes."
+npm run release -- 0.1.1 --skip-build
+npm run release -- patch --dry-run
+```
+
+Needs `gh` authenticated (`gh auth login`). End users of the installed app do **not** need Node.
 
 ### After install
 
@@ -157,6 +167,7 @@ npm run tauri:dev
 | `npm test` | Ledger parse, split, and price-book checks |
 | `npm run desktop:prepare` | Next standalone + desktop assets (used by the installer build) |
 | `npm run tauri:build` | Full Windows installer (see section above) |
+| `npm run release -- patch` | Bump, build, tag, push, and publish a GitHub Release |
 
 SQLite path is the same in browser/dev and packaged builds:
 `%LOCALAPPDATA%\mnm-loot-spliter\`. Nothing is prefilled.
