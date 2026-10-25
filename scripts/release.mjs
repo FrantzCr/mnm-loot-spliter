@@ -20,7 +20,16 @@ import { execFileSync } from "node:child_process";
 const root = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
 
 const PRODUCT = "MnM Loot Splitter";
-const NSIS_DIR = join(root, "src-tauri", "target", "release", "bundle", "nsis");
+
+/** Prefer CARGO_TARGET_DIR (Cursor/CI sandboxes) over the default src-tauri/target. */
+function nsisDirs() {
+  const dirs = [];
+  if (process.env.CARGO_TARGET_DIR) {
+    dirs.push(join(resolve(process.env.CARGO_TARGET_DIR), "release", "bundle", "nsis"));
+  }
+  dirs.push(join(root, "src-tauri", "target", "release", "bundle", "nsis"));
+  return dirs;
+}
 
 function usage(exitCode = 1) {
   console.error(`Usage: npm run release -- <patch|minor|major|x.y.z> [--notes "…"] [--skip-build] [--dry-run]`);
@@ -169,7 +178,12 @@ function setCargoVersion(version) {
 }
 
 function installerPath(version) {
-  return join(NSIS_DIR, `${PRODUCT}_${version}_x64-setup.exe`);
+  const fileName = `${PRODUCT}_${version}_x64-setup.exe`;
+  for (const dir of nsisDirs()) {
+    const candidate = join(dir, fileName);
+    if (existsSync(candidate)) return candidate;
+  }
+  return join(nsisDirs()[0], fileName);
 }
 
 function githubAssetName(version) {
