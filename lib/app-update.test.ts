@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { compareSemver, evaluateUpdate, pickSetupAsset, type GithubRelease } from "./app-update";
+import {
+  compareSemver,
+  evaluateUpdate,
+  pickSetupAsset,
+  shouldAutoCheckUpdates,
+  type GithubRelease,
+} from "./app-update";
 
 describe("compareSemver", () => {
   it("orders patch/minor/major", () => {
@@ -57,5 +63,11 @@ describe("evaluateUpdate", () => {
   it("reports up to date when same or older tag", () => {
     assert.equal(evaluateUpdate("0.1.2", release).status, "upToDate");
     assert.equal(evaluateUpdate("0.2.0", release).status, "upToDate");
+  });
+});
+
+describe("shouldAutoCheckUpdates", () => {
+  it("is false without window (Node tests)", () => {
+    assert.equal(shouldAutoCheckUpdates(), false);
   });
 });

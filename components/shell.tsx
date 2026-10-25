@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/components/api";
 import { LanguageMenu } from "@/components/language-menu";
 import { useI18n } from "@/components/locale";
+import { UpdateBanner } from "@/components/update-banner";
 import { cn } from "cn";
 
 const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a4503]";
@@ -137,6 +138,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <h1 className="font-heading text-sm tracking-wide sm:text-[0.9375rem]">{copy.shell.title}</h1>
           </div>
         </div>
+        <UpdateBanner />
         {needsWatchPath ? (
           <div className="border-b border-[#6e5338]/40 bg-[#efe6d6]">
             <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-4 py-2 sm:px-6">

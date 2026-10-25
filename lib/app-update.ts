@@ -97,3 +97,69 @@ export function evaluateUpdate(current: string, release: GithubRelease): UpdateC
 export function isTauriDesktop(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
+
+const DISMISS_PREFIX = "mnm:update-dismissed:";
+const LAST_CHECK_KEY = "mnm:update-last-check";
+
+/** Skip auto-banner for this latest version until a newer tag appears. */
+export function isUpdateDismissed(latestVersion: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(`${DISMISS_PREFIX}${latestVersion}`) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function dismissUpdate(latestVersion: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(`${DISMISS_PREFIX}${latestVersion}`, "1");
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+export function markUpdateChecked(now = Date.now()): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LAST_CHECK_KEY, String(now));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** True if we should hit GitHub again (startup, or last check older than `maxAgeMs`). */
+export function shouldAutoCheckUpdates(maxAgeMs = 6 * 60 * 60 * 1000): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = window.localStorage.getItem(LAST_CHECK_KEY);
+    if (!raw) return true;
+    const then = Number(raw);
+    if (!Number.isFinite(then)) return true;
+    return Date.now() - then >= maxAgeMs;
+  } catch {
+    return true;
+  }
+}
+
+export async function resolveInstalledVersion(apiVersion: string): Promise<string> {
+  if (!isTauriDesktop()) return apiVersion;
+  try {
+    const { getVersion } = await import("@tauri-apps/api/app");
+    return await getVersion();
+  } catch {
+    return apiVersion;
+  }
+}
+
+export async function installAvailableUpdate(asset: GithubReleaseAsset): Promise<void> {
+  if (!isTauriDesktop()) {
+    throw new Error("Desktop app required");
+  }
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("install_update", {
+    url: asset.browser_download_url,
+    fileName: asset.name,
+  });
+}

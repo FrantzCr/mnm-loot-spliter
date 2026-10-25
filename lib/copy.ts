@@ -129,6 +129,7 @@ const en = {
     updatesNoAsset: "A newer release exists but no Windows setup file was found.",
     updatesSmartScreen:
       "Windows may show SmartScreen for an unsigned installer — choose More info, then Run anyway.",
+    updatesLater: "Not now",
   },
   group: {
     title: "Group",
@@ -567,6 +568,7 @@ const fr: Copy = {
     updatesNoAsset: "Une version plus récente existe, mais sans fichier setup Windows.",
     updatesSmartScreen:
       "Windows peut afficher SmartScreen pour un installeur non signé — Plus d’infos, puis Exécuter quand même.",
+    updatesLater: "Pas maintenant",
   },
   group: {
     title: "Groupe",
@@ -997,6 +999,7 @@ const es: Copy = {
     updatesNoAsset: "Hay una versión más nueva, pero sin archivo setup de Windows.",
     updatesSmartScreen:
       "Windows puede mostrar SmartScreen en un instalador sin firmar — Más información y Ejecutar de todas formas.",
+    updatesLater: "Ahora no",
   },
   group: {
     title: "Grupo",

@@ -13,7 +13,9 @@ import { Label } from "@/components/ui/label";
 import {
   evaluateUpdate,
   fetchLatestRelease,
+  installAvailableUpdate,
   isTauriDesktop,
+  resolveInstalledVersion,
   type AppVersionInfo,
   type UpdateCheckResult,
 } from "@/lib/app-update";
@@ -77,21 +79,9 @@ export function HomeScreen() {
       try {
         const info = await api<AppVersionInfo>("/api/version");
         const inTauri = isTauriDesktop();
-        if (inTauri) {
-          try {
-            const { getVersion } = await import("@tauri-apps/api/app");
-            const desktopVersion = await getVersion();
-            if (!cancelled) {
-              setVersionInfo({ ...info, version: desktopVersion });
-              setDesktop(true);
-              return;
-            }
-          } catch {
-            // fall through to package.json version
-          }
-        }
+        const version = await resolveInstalledVersion(info.version);
         if (!cancelled) {
-          setVersionInfo(info);
+          setVersionInfo({ ...info, version });
           setDesktop(inTauri);
         }
       } catch {
@@ -144,11 +134,7 @@ export function HomeScreen() {
     setInstallBusy(true);
     setUpdateError(null);
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
-      await invoke("install_update", {
-        url: updateResult.asset.browser_download_url,
-        fileName: updateResult.asset.name,
-      });
+      await installAvailableUpdate(updateResult.asset);
     } catch {
       setUpdateError(copy.home.updatesInstallFailed);
       setInstallBusy(false);
