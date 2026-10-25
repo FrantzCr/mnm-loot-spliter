@@ -12,7 +12,7 @@
  *   --skip-build    Reuse an already-built installer for the new version
  *   --dry-run       Print steps without writing, building, or publishing
  */
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
@@ -241,6 +241,12 @@ if (!existsSync(setup)) {
   console.error(`Installer not found:\n  ${setup}\nRun without --skip-build, or build first.`);
   process.exit(1);
 }
+const setupSize = statSync(setup).size;
+if (setupSize < 5_000_000) {
+  console.error(`Installer looks too small (${setupSize} bytes): ${setup}`);
+  process.exit(1);
+}
+console.log(`Installer OK (${(setupSize / (1024 * 1024)).toFixed(1)} MiB) → asset ${assetName}`);
 
 runInherit("git", [
   "add",

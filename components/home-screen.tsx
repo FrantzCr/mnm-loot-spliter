@@ -10,6 +10,13 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  evaluateUpdate,
+  fetchLatestRelease,
+  isTauriDesktop,
+  type AppVersionInfo,
+  type UpdateCheckResult,
+} from "@/lib/app-update";
 
 type WatchStatus = {
   watchPath: string | null;
@@ -30,6 +37,12 @@ export function HomeScreen() {
   const [pathReady, setPathReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [versionInfo, setVersionInfo] = useState<AppVersionInfo | null>(null);
+  const [desktop, setDesktop] = useState(false);
+  const [updateBusy, setUpdateBusy] = useState(false);
+  const [installBusy, setInstallBusy] = useState(false);
+  const [updateResult, setUpdateResult] = useState<UpdateCheckResult | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -58,6 +71,38 @@ export function HomeScreen() {
     };
   }, [load]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const info = await api<AppVersionInfo>("/api/version");
+        const inTauri = isTauriDesktop();
+        if (inTauri) {
+          try {
+            const { getVersion } = await import("@tauri-apps/api/app");
+            const desktopVersion = await getVersion();
+            if (!cancelled) {
+              setVersionInfo({ ...info, version: desktopVersion });
+              setDesktop(true);
+              return;
+            }
+          } catch {
+            // fall through to package.json version
+          }
+        }
+        if (!cancelled) {
+          setVersionInfo(info);
+          setDesktop(inTauri);
+        }
+      } catch {
+        if (!cancelled) setVersionInfo(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   async function savePath() {
     setSaving(true);
     setError(null);
@@ -72,6 +117,41 @@ export function HomeScreen() {
       setError(explain(caught, ErrorCode.homeSaveFailed));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function checkUpdates() {
+    if (!versionInfo) return;
+    setUpdateBusy(true);
+    setUpdateError(null);
+    setUpdateResult(null);
+    try {
+      const release = await fetchLatestRelease(versionInfo.githubRepo);
+      setUpdateResult(evaluateUpdate(versionInfo.version, release));
+    } catch {
+      setUpdateError(copy.home.updatesFailed);
+    } finally {
+      setUpdateBusy(false);
+    }
+  }
+
+  async function installUpdate() {
+    if (!updateResult || updateResult.status !== "available") return;
+    if (!desktop) {
+      window.open(updateResult.htmlUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+    setInstallBusy(true);
+    setUpdateError(null);
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("install_update", {
+        url: updateResult.asset.browser_download_url,
+        fileName: updateResult.asset.name,
+      });
+    } catch {
+      setUpdateError(copy.home.updatesInstallFailed);
+      setInstallBusy(false);
     }
   }
 
@@ -131,6 +211,81 @@ export function HomeScreen() {
           ) : (
             <p className="text-sm text-muted-foreground">{copy.home.noScan}</p>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle as="h3">{copy.home.updatesTitle}</CardTitle>
+          <CardDescription>{copy.home.updatesBody}</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3">
+          {versionInfo ? (
+            <p className="text-sm font-medium">{copy.home.updatesInstalled(versionInfo.version)}</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">{copy.home.loading}</p>
+          )}
+          {!desktop ? <p className="text-sm text-muted-foreground">{copy.home.updatesDesktopOnly}</p> : null}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!versionInfo || updateBusy || installBusy}
+              onClick={() => void checkUpdates()}
+            >
+              {updateBusy ? copy.home.updatesChecking : copy.home.updatesCheck}
+            </Button>
+            {versionInfo ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => window.open(versionInfo.releasesUrl, "_blank", "noopener,noreferrer")}
+              >
+                {copy.home.updatesOpenRelease}
+              </Button>
+            ) : null}
+          </div>
+          {updateResult?.status === "upToDate" ? (
+            <p className="text-sm text-muted-foreground">{copy.home.updatesUpToDate(updateResult.latest)}</p>
+          ) : null}
+          {updateResult?.status === "noAsset" ? (
+            <div className="grid gap-2">
+              <p className="text-sm text-muted-foreground">{copy.home.updatesNoAsset}</p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => window.open(updateResult.htmlUrl, "_blank", "noopener,noreferrer")}
+              >
+                {copy.home.updatesOpenRelease}
+              </Button>
+            </div>
+          ) : null}
+          {updateResult?.status === "available" ? (
+            <div className="grid gap-2 rounded-sm border border-[#6e5338]/40 bg-[#efe6d6]/40 p-3">
+              <p className="text-sm font-medium">
+                {copy.home.updatesAvailable(updateResult.latest, updateResult.current)}
+              </p>
+              {updateResult.notes ? (
+                <pre className="max-h-40 overflow-auto whitespace-pre-wrap font-sans text-xs text-muted-foreground">
+                  {updateResult.notes}
+                </pre>
+              ) : null}
+              <p className="text-xs text-muted-foreground">{copy.home.updatesSmartScreen}</p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" disabled={installBusy} onClick={() => void installUpdate()}>
+                  {installBusy ? copy.home.updatesDownloading : copy.home.updatesDownload}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => window.open(updateResult.htmlUrl, "_blank", "noopener,noreferrer")}
+                >
+                  {copy.home.updatesOpenRelease}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          {updateError ? <p className="text-sm text-destructive">{updateError}</p> : null}
         </CardContent>
       </Card>
 

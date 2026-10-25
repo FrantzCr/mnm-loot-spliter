@@ -20,10 +20,14 @@ Pre-built Windows setups are published on **this same repository**, under
 [**Releases**](https://github.com/FrantzCr/mnm-loot-spliter/releases):
 
 1. Open the latest release.
-2. Download the `.exe` (for example `MnM_Loot_Splitter_0.1.0_x64-setup.exe`).
-3. Run it and install.
+2. Download the `.exe` (for example `MnM_Loot_Splitter_0.1.2_x64-setup.exe`).
+3. Run it and install (per-user, no admin required).
+
+If **Windows SmartScreen** appears (“Windows protected your PC”), choose **More info**, then **Run anyway**. The installer is unsigned until a code-signing certificate is used.
 
 No Node, Rust, or Visual Studio needed — just install and play.
+
+Installed desktop builds can also check for updates from **Options → Version & updates**.
 
 If there is no release yet, or you prefer to compile yourself, use the section
 below.
@@ -92,9 +96,12 @@ Needs `gh` authenticated (`gh auth login`). End users of the installed app do **
 
 ### After install
 
+- App install folder (current user): `%LOCALAPPDATA%\MnM Loot Splitter\`
 - App data (SQLite): `%LOCALAPPDATA%\mnm-loot-spliter\registre.sqlite`
+- Sidecar logs (if the window fails to open): `%LOCALAPPDATA%\com.mnm-loot-spliter.register\logs\`
 - Packaged app port: **14721** (local only)
 - Closing the window stops the embedded server
+- WebView2 is installed automatically by the setup if missing
 
 ---
 

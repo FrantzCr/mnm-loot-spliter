@@ -11,7 +11,7 @@ import { cp, mkdir, readdir, readFile, rm, stat, unlink, writeFile } from "node:
 import { dirname, extname, join, resolve } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 
 const root = resolve(join(dirname(fileURLToPath(import.meta.url)), ".."));
 const standalone = join(root, ".next", "standalone");
@@ -263,6 +263,9 @@ async function main() {
   await assertNoPersonalTraces(outDir, root);
   console.log("Personal-path check passed");
 
+  console.log("Smoke-checking packaged register runtime");
+  await assertRegisterReady(outDir);
+
   await writeFile(
     join(outDir, "RUNTIME.txt"),
     [
@@ -277,6 +280,71 @@ async function main() {
   const pkg = JSON.parse(await readFile(join(outDir, "package.json"), "utf8"));
   const size = (await stat(join(outDir, "server.js"))).size;
   console.log(`Ready: ${outDir} (${pkg.name ?? "register"}, Node ${version}, server.js ${size} B)`);
+}
+
+/** Fail the desktop prepare if the register tree cannot serve HTTP. */
+async function assertRegisterReady(dir) {
+  const node = join(dir, "node.exe");
+  const server = join(dir, "server.js");
+  const nextServer = join(dir, ".next", "server");
+  for (const required of [node, server, nextServer]) {
+    if (!existsSync(required)) {
+      throw new Error(`Register runtime incomplete — missing ${required}`);
+    }
+  }
+  const nodeStat = await stat(node);
+  if (nodeStat.size < 10_000_000) {
+    throw new Error(`node.exe looks too small (${nodeStat.size} bytes)`);
+  }
+
+  const port = String(18000 + Math.floor(Math.random() * 1000));
+  const child = spawn(node, ["server.js"], {
+    cwd: dir,
+    env: { ...process.env, PORT: port, HOSTNAME: "127.0.0.1" },
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
+  });
+
+  let settled = false;
+  const logs = { out: "", err: "" };
+  child.stdout?.on("data", (chunk) => {
+    logs.out += chunk.toString();
+  });
+  child.stderr?.on("data", (chunk) => {
+    logs.err += chunk.toString();
+  });
+
+  try {
+    const deadline = Date.now() + 45_000;
+    while (Date.now() < deadline) {
+      if (child.exitCode != null) {
+        throw new Error(
+          `Register smoke process exited early (${child.exitCode}).\n${logs.err || logs.out}`,
+        );
+      }
+      try {
+        const response = await fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(800) });
+        if (response.ok) {
+          settled = true;
+          break;
+        }
+      } catch {
+        // keep waiting
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    if (!settled) {
+      throw new Error(`Register smoke did not answer on port ${port}.\n${logs.err || logs.out}`);
+    }
+    console.log(`Register smoke OK on :${port}`);
+  } finally {
+    child.kill();
+    await new Promise((resolve) => {
+      if (child.exitCode != null) return resolve();
+      child.once("exit", () => resolve());
+      setTimeout(resolve, 2000);
+    });
+  }
 }
 
 main().catch((error) => {

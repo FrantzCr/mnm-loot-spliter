@@ -3,5 +3,9 @@
   "identifier": "default",
   "description": "Main register window",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "core:app:allow-version",
+    "allow-install-update"
+  ]
 }

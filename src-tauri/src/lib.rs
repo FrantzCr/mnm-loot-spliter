@@ -1,4 +1,5 @@
-use std::fs::OpenOptions;
+use std::fs::{self, OpenOptions};
+use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -26,10 +27,33 @@ fn port_open(port: &str) -> bool {
   .is_ok()
 }
 
+/// HTTP GET / — TCP alone can succeed before Next is ready to serve pages.
+fn register_http_ok(port: &str) -> bool {
+  let addr = format!("127.0.0.1:{port}");
+  let Ok(mut stream) = TcpStream::connect_timeout(
+    &addr.parse().expect("static address"),
+    Duration::from_millis(400),
+  ) else {
+    return false;
+  };
+  let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
+  let _ = stream.set_write_timeout(Some(Duration::from_secs(2)));
+  let request = format!("GET / HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n");
+  if stream.write_all(request.as_bytes()).is_err() {
+    return false;
+  }
+  let mut buf = [0_u8; 64];
+  let Ok(n) = stream.read(&mut buf) else {
+    return false;
+  };
+  let head = String::from_utf8_lossy(&buf[..n]);
+  head.starts_with("HTTP/1.1 200") || head.starts_with("HTTP/1.0 200")
+}
+
 fn wait_for_register(port: &str, timeout: Duration) -> bool {
   let started = std::time::Instant::now();
   while started.elapsed() < timeout {
-    if port_open(port) {
+    if register_http_ok(port) {
       return true;
     }
     thread::sleep(Duration::from_millis(250));
@@ -66,14 +90,22 @@ fn sidecar_log_paths(app: &AppHandle) -> Option<(PathBuf, PathBuf)> {
 
 fn append_sidecar_note(path: &Path, note: &str) {
   if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
-    use std::io::Write;
     let _ = writeln!(file, "{note}");
   }
 }
 
 fn start_sidecar(app: &AppHandle, state: &SidecarState) -> Result<(), String> {
-  if port_open(PACKAGED_REGISTER_PORT) {
+  if register_http_ok(PACKAGED_REGISTER_PORT) {
     return Ok(());
+  }
+  if port_open(PACKAGED_REGISTER_PORT) {
+    // Port taken but not serving our app yet — wait briefly before spawning another Node.
+    if wait_for_register(PACKAGED_REGISTER_PORT, Duration::from_secs(8)) {
+      return Ok(());
+    }
+    return Err(format!(
+      "Port {PACKAGED_REGISTER_PORT} is in use but the register did not respond. Close other MnM Loot Splitter instances and try again."
+    ));
   }
 
   let register_dir = packaged_register_dir(app).ok_or_else(|| {
@@ -193,10 +225,81 @@ fn show_startup_error(app: &AppHandle, error: &str) {
   }
 }
 
+/// Download a GitHub release setup.exe and launch NSIS in `/UPDATE` mode, then exit.
+#[tauri::command]
+fn install_update(app: AppHandle, url: String, file_name: String) -> Result<(), String> {
+  if !(url.starts_with("https://github.com/")
+    || url.starts_with("https://objects.githubusercontent.com/")
+    || url.starts_with("https://release-assets.githubusercontent.com/"))
+  {
+    return Err("Update URL must be a GitHub release asset.".into());
+  }
+  let safe_name = Path::new(&file_name)
+    .file_name()
+    .and_then(|n| n.to_str())
+    .filter(|n| n.ends_with(".exe") && !n.contains(".."))
+    .ok_or_else(|| "Invalid installer file name.".to_string())?;
+
+  let temp_dir = std::env::temp_dir().join("mnm-loot-spliter-updates");
+  fs::create_dir_all(&temp_dir).map_err(|e| format!("Could not create temp dir: {e}"))?;
+  let dest = temp_dir.join(safe_name);
+
+  download_https_file(&url, &dest)?;
+
+  let mut command = Command::new(&dest);
+  // Tauri NSIS: update mode skips some first-run prompts and replaces in place.
+  command.arg("/UPDATE");
+  #[cfg(windows)]
+  {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+    const DETACHED_PROCESS: u32 = 0x0000_0008;
+    command.creation_flags(CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS);
+  }
+  command
+    .spawn()
+    .map_err(|e| format!("Could not launch the installer: {e}"))?;
+
+  // Quit so NSIS can overwrite locked files (exe + resources).
+  app.exit(0);
+  Ok(())
+}
+
+fn download_https_file(url: &str, dest: &Path) -> Result<(), String> {
+  // Prefer PowerShell on Windows so we stay dependency-light and follow GitHub redirects.
+  #[cfg(windows)]
+  {
+    let dest_str = dest.to_string_lossy().replace('\'', "''");
+    let url_str = url.replace('\'', "''");
+    let script = format!(
+      "Invoke-WebRequest -Uri '{url_str}' -OutFile '{dest_str}' -UseBasicParsing"
+    );
+    let status = Command::new("powershell.exe")
+      .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+      .status()
+      .map_err(|e| format!("Download failed to start: {e}"))?;
+    if !status.success() {
+      return Err(format!("Download failed (exit {status})."));
+    }
+    let meta = fs::metadata(dest).map_err(|e| format!("Downloaded file missing: {e}"))?;
+    if meta.len() < 1_000_000 {
+      let _ = fs::remove_file(dest);
+      return Err("Downloaded installer looks too small — check the release asset.".into());
+    }
+    return Ok(());
+  }
+  #[cfg(not(windows))]
+  {
+    let _ = (url, dest);
+    Err("Updates are only supported on Windows.".into())
+  }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
     .manage(SidecarState(Mutex::new(None)))
+    .invoke_handler(tauri::generate_handler![install_update])
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(

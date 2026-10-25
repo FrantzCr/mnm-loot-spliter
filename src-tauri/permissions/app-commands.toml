@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-install-update"
+description = "Allows downloading a GitHub release setup and launching it to update the app."
+commands.allow = ["install_update"]
