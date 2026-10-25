@@ -17,6 +17,7 @@ const en = {
     language: "Language",
     nav: "Main menu",
     skip: "Skip to content",
+    versionLabel: (version: string) => `v${version}`,
   },
   recap: {
     title: "Recap",
@@ -459,6 +460,7 @@ const fr: Copy = {
     language: "Langue",
     nav: "Menu principal",
     skip: "Aller au contenu",
+    versionLabel: (version) => `v${version}`,
   },
   recap: {
     title: "Récap",
@@ -891,6 +893,7 @@ const es: Copy = {
     language: "Idioma",
     nav: "Menú principal",
     skip: "Ir al contenido",
+    versionLabel: (version) => `v${version}`,
   },
   recap: {
     title: "Resumen",

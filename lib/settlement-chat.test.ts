@@ -42,7 +42,7 @@ describe("settlement-chat", () => {
     assert.equal(messages.length, 1);
     assert.ok(
       messages[0].startsWith(
-        "FYI — Currently for an equitable loot split based on vendor loot prices, here's who can tip whom: ",
+        "MnM Loot Splitter — equitable loot split (vendor prices), tip whom: ",
       ),
     );
     assert.ok(messages[0].includes("Alice>Bob 5s"));
@@ -58,6 +58,7 @@ describe("settlement-chat", () => {
       { from: "Carol", to: "Dave", copper: 10 },
     ]);
     assert.deepEqual(messages, [EQUITABLE_CHAT_ANNOUNCE]);
+    assert.ok(EQUITABLE_CHAT_ANNOUNCE.startsWith("MnM Loot Splitter"));
   });
 
   it("splits long lists into numbered single-line parts", () => {
@@ -72,7 +73,9 @@ describe("settlement-chat", () => {
       assert.ok(message.length <= 160, message);
       assert.ok(!message.includes("\n"));
       assert.ok(
-        message.startsWith(`FYI — equitable split (vendor prices) (${index + 1}/${messages.length}):`),
+        message.startsWith(
+          `MnM Loot Splitter — equitable split (vendor prices) (${index + 1}/${messages.length}):`,
+        ),
       );
     }
   });

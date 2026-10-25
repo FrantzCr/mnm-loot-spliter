@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { api } from "@/components/api";
 import { useI18n } from "@/components/locale";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,10 +11,9 @@ import {
   installAvailableUpdate,
   isTauriDesktop,
   isUpdateDismissed,
+  loadRunningAppVersion,
   markUpdateChecked,
-  resolveInstalledVersion,
   shouldAutoCheckUpdates,
-  type AppVersionInfo,
   type UpdateCheckResult,
 } from "@/lib/app-update";
 import { cn } from "cn";
@@ -36,11 +34,11 @@ export function UpdateBanner() {
     if (!isTauriDesktop()) return;
     if (!force && !shouldAutoCheckUpdates()) return;
     try {
-      const info = await api<AppVersionInfo>("/api/version");
-      const current = await resolveInstalledVersion(info.version);
+      const info = await loadRunningAppVersion();
+      if (!info) return;
       const release = await fetchLatestRelease(info.githubRepo);
       markUpdateChecked();
-      const result = evaluateUpdate(current, release);
+      const result = evaluateUpdate(info.version, release);
       if (result.status !== "available") {
         setOffer(null);
         return;

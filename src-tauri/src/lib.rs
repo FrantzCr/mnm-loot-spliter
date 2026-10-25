@@ -94,20 +94,67 @@ fn append_sidecar_note(path: &Path, note: &str) {
   }
 }
 
-fn start_sidecar(app: &AppHandle, state: &SidecarState) -> Result<(), String> {
-  if register_http_ok(PACKAGED_REGISTER_PORT) {
-    return Ok(());
+fn packaged_build_id(register_dir: &Path) -> Option<String> {
+  let raw = fs::read_to_string(register_dir.join(".next").join("BUILD_ID")).ok()?;
+  let id = raw.trim();
+  if id.is_empty() {
+    None
+  } else {
+    Some(id.to_string())
   }
-  if port_open(PACKAGED_REGISTER_PORT) {
-    // Port taken but not serving our app yet — wait briefly before spawning another Node.
-    if wait_for_register(PACKAGED_REGISTER_PORT, Duration::from_secs(8)) {
-      return Ok(());
-    }
-    return Err(format!(
-      "Port {PACKAGED_REGISTER_PORT} is in use but the register did not respond. Close other MnM Loot Splitter instances and try again."
-    ));
-  }
+}
 
+/// Next puts the build id in RSC payloads as `"b":"<id>"`. A stale Node left on
+/// 14721 after an upgrade still answers HTTP 200 but serves chunk URLs from the
+/// previous build — soft-nav to /group then whitescreens.
+fn live_register_matches_build(port: &str, expected_build_id: &str) -> bool {
+  let addr = format!("127.0.0.1:{port}");
+  let Ok(mut stream) = TcpStream::connect_timeout(
+    &addr.parse().expect("static address"),
+    Duration::from_millis(400),
+  ) else {
+    return false;
+  };
+  let _ = stream.set_read_timeout(Some(Duration::from_secs(3)));
+  let _ = stream.set_write_timeout(Some(Duration::from_secs(2)));
+  let request = format!(
+    "GET / HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nRSC: 1\r\nConnection: close\r\n\r\n"
+  );
+  if stream.write_all(request.as_bytes()).is_err() {
+    return false;
+  }
+  let mut body = Vec::new();
+  let _ = stream.read_to_end(&mut body);
+  let text = String::from_utf8_lossy(&body);
+  if !(text.contains("HTTP/1.1 200") || text.contains("HTTP/1.0 200")) {
+    return false;
+  }
+  text.contains(&format!("\"b\":\"{expected_build_id}\""))
+}
+
+/// Kill orphaned Node listeners on the packaged register port (Windows).
+/// Safe for this app: only targets `node` processes bound to 14721.
+#[cfg(windows)]
+fn kill_stale_register_listeners(port: &str) {
+  use std::os::windows::process::CommandExt;
+  const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+  let script = format!(
+    "Get-NetTCPConnection -LocalPort {port} -State Listen -ErrorAction SilentlyContinue | ForEach-Object {{ $proc = Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue; if ($proc -and $proc.ProcessName -eq 'node') {{ Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }} }}"
+  );
+  let _ = Command::new("powershell.exe")
+    .args(["-NoProfile", "-Command", &script])
+    .stdin(Stdio::null())
+    .stdout(Stdio::null())
+    .stderr(Stdio::null())
+    .creation_flags(CREATE_NO_WINDOW)
+    .status();
+  thread::sleep(Duration::from_millis(400));
+}
+
+#[cfg(not(windows))]
+fn kill_stale_register_listeners(_port: &str) {}
+
+fn start_sidecar(app: &AppHandle, state: &SidecarState) -> Result<(), String> {
   let register_dir = packaged_register_dir(app).ok_or_else(|| {
     let hint = app
       .path()
@@ -118,6 +165,44 @@ fn start_sidecar(app: &AppHandle, state: &SidecarState) -> Result<(), String> {
       "Packaged register runtime not found under {hint} (expected resources/register). Rebuild with npm run desktop:prepare."
     )
   })?;
+  let expected_build = packaged_build_id(&register_dir);
+
+  if register_http_ok(PACKAGED_REGISTER_PORT) {
+    if let Some(ref build) = expected_build {
+      if live_register_matches_build(PACKAGED_REGISTER_PORT, build) {
+        return Ok(());
+      }
+      log::warn!(
+        "Register on :{PACKAGED_REGISTER_PORT} is stale (build mismatch) — replacing sidecar"
+      );
+    } else {
+      // No BUILD_ID on disk: keep previous reuse behaviour.
+      return Ok(());
+    }
+    kill_stale_register_listeners(PACKAGED_REGISTER_PORT);
+  } else if port_open(PACKAGED_REGISTER_PORT) {
+    // Port taken but not serving yet — wait briefly, then verify build or replace.
+    if wait_for_register(PACKAGED_REGISTER_PORT, Duration::from_secs(8)) {
+      if expected_build
+        .as_ref()
+        .is_none_or(|build| live_register_matches_build(PACKAGED_REGISTER_PORT, build))
+      {
+        return Ok(());
+      }
+      log::warn!(
+        "Register on :{PACKAGED_REGISTER_PORT} came up with a stale build — replacing sidecar"
+      );
+      kill_stale_register_listeners(PACKAGED_REGISTER_PORT);
+    } else {
+      kill_stale_register_listeners(PACKAGED_REGISTER_PORT);
+      if port_open(PACKAGED_REGISTER_PORT) {
+        return Err(format!(
+          "Port {PACKAGED_REGISTER_PORT} is in use but the register did not respond. Close other MnM Loot Splitter instances and try again."
+        ));
+      }
+    }
+  }
+
   let node = register_dir.join("node.exe");
 
   let mut command = Command::new(&node);

@@ -336,7 +336,30 @@ async function assertRegisterReady(dir) {
     if (!settled) {
       throw new Error(`Register smoke did not answer on port ${port}.\n${logs.err || logs.out}`);
     }
-    console.log(`Register smoke OK on :${port}`);
+
+    // Soft-nav to /group fails hard if HTML references missing client chunks (white screen).
+    const group = await fetch(`http://127.0.0.1:${port}/group`, {
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!group.ok) {
+      throw new Error(`Register smoke /group returned HTTP ${group.status}`);
+    }
+    const html = await group.text();
+    const chunkRefs = [...html.matchAll(/\/_next\/static\/chunks\/[^"'\s>]+/g)].map((m) => m[0]);
+    const missing = [];
+    for (const ref of new Set(chunkRefs)) {
+      const name = ref.split("/").pop();
+      if (!name) continue;
+      if (!existsSync(join(dir, ".next", "static", "chunks", name))) {
+        missing.push(name);
+      }
+    }
+    if (missing.length > 0) {
+      throw new Error(
+        `Register smoke /group references missing static chunks:\n  ${missing.join("\n  ")}`,
+      );
+    }
+    console.log(`Register smoke OK on :${port} (/, /group, ${chunkRefs.length} chunk refs)`);
   } finally {
     child.kill();
     await new Promise((resolve) => {

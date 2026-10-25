@@ -15,7 +15,7 @@ import {
   fetchLatestRelease,
   installAvailableUpdate,
   isTauriDesktop,
-  resolveInstalledVersion,
+  loadRunningAppVersion,
   type AppVersionInfo,
   type UpdateCheckResult,
 } from "@/lib/app-update";
@@ -76,16 +76,10 @@ export function HomeScreen() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      try {
-        const info = await api<AppVersionInfo>("/api/version");
-        const inTauri = isTauriDesktop();
-        const version = await resolveInstalledVersion(info.version);
-        if (!cancelled) {
-          setVersionInfo({ ...info, version });
-          setDesktop(inTauri);
-        }
-      } catch {
-        if (!cancelled) setVersionInfo(null);
+      const info = await loadRunningAppVersion();
+      if (!cancelled) {
+        setVersionInfo(info);
+        setDesktop(isTauriDesktop());
       }
     })();
     return () => {

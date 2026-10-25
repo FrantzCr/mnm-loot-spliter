@@ -153,6 +153,51 @@ export async function resolveInstalledVersion(apiVersion: string): Promise<strin
   }
 }
 
+/** Best-effort version for the running UI (Tauri exe → API → static JSON). */
+export async function loadRunningAppVersion(): Promise<AppVersionInfo | null> {
+  const fallbacks: Array<() => Promise<AppVersionInfo | null>> = [
+    async () => {
+      if (!isTauriDesktop()) return null;
+      try {
+        const { getVersion } = await import("@tauri-apps/api/app");
+        const version = await getVersion();
+        return {
+          name: "mnm-loot-spliter",
+          version,
+          githubRepo: "FrantzCr/mnm-loot-spliter",
+          releasesUrl: "https://github.com/FrantzCr/mnm-loot-spliter/releases",
+        };
+      } catch {
+        return null;
+      }
+    },
+    async () => {
+      try {
+        const response = await fetch("/api/version", { cache: "no-store" });
+        if (!response.ok) return null;
+        return (await response.json()) as AppVersionInfo;
+      } catch {
+        return null;
+      }
+    },
+    async () => {
+      try {
+        const response = await fetch("/app-version.json", { cache: "no-store" });
+        if (!response.ok) return null;
+        return (await response.json()) as AppVersionInfo;
+      } catch {
+        return null;
+      }
+    },
+  ];
+
+  for (const load of fallbacks) {
+    const info = await load();
+    if (info?.version) return info;
+  }
+  return null;
+}
+
 export async function installAvailableUpdate(asset: GithubReleaseAsset): Promise<void> {
   if (!isTauriDesktop()) {
     throw new Error("Desktop app required");

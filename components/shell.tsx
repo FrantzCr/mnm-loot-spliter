@@ -8,6 +8,7 @@ import { api } from "@/components/api";
 import { LanguageMenu } from "@/components/language-menu";
 import { useI18n } from "@/components/locale";
 import { UpdateBanner } from "@/components/update-banner";
+import { loadRunningAppVersion } from "@/lib/app-update";
 import { cn } from "cn";
 
 const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a4503]";
@@ -16,6 +17,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { copy } = useI18n();
   const [needsWatchPath, setNeedsWatchPath] = useState(false);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
   const onOptions = pathname.startsWith("/options");
   const links = [
     { href: "/group", label: copy.shell.group },
@@ -71,6 +73,17 @@ export function Shell({ children }: { children: React.ReactNode }) {
     };
   }, [pathname, refreshWatchPath]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const info = await loadRunningAppVersion();
+      if (!cancelled && info?.version) setAppVersion(info.version);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className="flex min-h-screen flex-col text-foreground">
       <div className="flex flex-1 flex-col bg-[#f3eee4]">
@@ -100,9 +113,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
               <img
                 src="/app-icon.png"
                 alt=""
-                width={28}
-                height={28}
-                className="size-7 shrink-0 object-contain"
+                width={36}
+                height={36}
+                className="size-9 shrink-0 object-contain"
                 aria-hidden="true"
               />
               Monsters & Memories
@@ -134,8 +147,16 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         <div className="border-b border-[#6e5338]/45 bg-[#8d6234] text-[#f7f3ea]">
-          <div className="mx-auto flex max-w-5xl items-center px-4 py-1.5 sm:px-6">
+          <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-1.5 sm:px-6">
             <h1 className="font-heading text-sm tracking-wide sm:text-[0.9375rem]">{copy.shell.title}</h1>
+            {appVersion ? (
+              <p
+                className="shrink-0 font-mono text-xs tracking-wide text-[#f7f3ea]/85"
+                title={copy.home.updatesInstalled(appVersion)}
+              >
+                {copy.shell.versionLabel(appVersion)}
+              </p>
+            ) : null}
           </div>
         </div>
         <UpdateBanner />

@@ -10,6 +10,8 @@ export const GAME_CHAT_MAX = 240;
 /** Chat tips round to the nearest silver (100 copper). */
 export const CHAT_COPPER_STEP = COPPER_PER_SILVER;
 
+const APP_CHAT_NAME = "MnM Loot Splitter";
+
 export function roundCopperForChat(copper: number): number {
   if (!Number.isFinite(copper)) return 0;
   const sign = copper < 0 ? -1 : 1;
@@ -32,7 +34,7 @@ export function formatCoinsChat(copper: number): string {
 
 /** When every tip rounds under a silver, announce that the split is already fair. */
 export const EQUITABLE_CHAT_ANNOUNCE =
-  "FYI — Currently for an equitable loot split based on vendor loot prices, everyone is even, no tips needed.";
+  `${APP_CHAT_NAME} — equitable loot split (vendor prices): everyone is even, no tips needed.`;
 
 function chatName(name: string): string {
   return name.replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim() || "?";
@@ -57,16 +59,15 @@ export function buildSettlementChatMessages(
   const segments = rounded.map(formatTransferChat);
   const sep = " | ";
 
-  // Friendly FYI one-liner for group chat — no newlines, not a demand.
-  const singleIntro =
-    "FYI — Currently for an equitable loot split based on vendor loot prices, here's who can tip whom: ";
+  // App-branded one-liner for group chat — no newlines, not a demand.
+  const singleIntro = `${APP_CHAT_NAME} — equitable loot split (vendor prices), tip whom: `;
   const singleBody = segments.join(sep);
   if (singleIntro.length + singleBody.length <= maxLen) {
     return [singleIntro + singleBody];
   }
 
-  // Multi-part: reserve room for "FYI — equitable split (vendor prices) (99/99): "
-  const partIntroLen = "FYI — equitable split (vendor prices) (99/99): ".length;
+  // Multi-part: reserve room for "MnM Loot Splitter — equitable split (vendor prices) (99/99): "
+  const partIntroLen = `${APP_CHAT_NAME} — equitable split (vendor prices) (99/99): `.length;
   const budget = Math.max(24, maxLen - partIntroLen);
   const bodies: string[] = [];
   let current = "";
@@ -88,6 +89,7 @@ export function buildSettlementChatMessages(
 
   const total = bodies.length;
   return bodies.map(
-    (body, index) => `FYI — equitable split (vendor prices) (${index + 1}/${total}): ${body}`,
+    (body, index) =>
+      `${APP_CHAT_NAME} — equitable split (vendor prices) (${index + 1}/${total}): ${body}`,
   );
 }
