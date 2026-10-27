@@ -14,13 +14,15 @@ async function readVersionPayload(): Promise<{
 }> {
   const releasesUrl = `https://github.com/${GITHUB_REPO}/releases`;
   // Prefer the static file baked into the register/public tree (survives packaging).
+  // Runtime-only paths (cwd): ignored for tracing so the standalone build does not pull in the repo.
+  const root = /* turbopackIgnore: true */ process.cwd();
   for (const candidate of [
-    join(process.cwd(), "public", "app-version.json"),
-    join(process.cwd(), "app-version.json"),
-    join(process.cwd(), "package.json"),
+    join(root, "public", "app-version.json"),
+    join(root, "app-version.json"),
+    join(root, "package.json"),
   ]) {
     try {
-      const raw = await readFile(candidate, "utf8");
+      const raw = await readFile(/* turbopackIgnore: true */ candidate, "utf8");
       const parsed = JSON.parse(raw) as { name?: string; version?: string };
       if (parsed.version) {
         return {

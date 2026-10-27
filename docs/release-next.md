@@ -121,3 +121,18 @@
 - Coins centred inside buttons; totals labels stay on one line in every language.
 
 **Upgrade note:** the local database migrates automatically (schema 12) and re-reads Social ledgers once to import party history.
+
+## 0.2.1 (hotfix)
+
+- **2026-10-27** — v0.2.0 published. Found: in-app update never worked (also in 0.1.x): the window loads the UI from the local server (`http://127.0.0.1:14721`), which Tauri treats as a remote origin, so `install_update` was denied by the ACL. Fix: `capabilities/default.json` `remote.urls` = 127.0.0.1:14721 (+ 4721 dev). Also: `install_update` async (spawn_blocking), PowerShell download forces TLS 1.2, hides progress, no console window; UI shows the real error after the generic message. `/api/version` file reads marked `turbopackIgnore` (tracing warning).
+- **Upgrade path:** 0.1.4 and 0.2.0 cannot self-update (they lack the fix) → install 0.2.1 manually once; auto-update works from 0.2.1 on.
+- **Release:** `npm run release -- 0.2.1 --notes "…"` (run by Frantz).
+
+### Draft release notes (0.2.1)
+
+**Fixes**
+- In-app update now works: "Download and install" fetches the setup and relaunches the installer. Install this version manually once (from 0.2.0 or older); later updates install from the app.
+- The window no longer freezes while the update downloads; if it fails, the reason is shown.
+- Build: removed a file-tracing warning.
+
+**Reminder:** opening the app a second time focuses the existing window (since 0.2.0).

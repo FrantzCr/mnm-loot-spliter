@@ -198,6 +198,13 @@ export async function loadRunningAppVersion(): Promise<AppVersionInfo | null> {
   return null;
 }
 
+/** Readable reason from a failed install (Tauri rejects with a plain string). */
+export function updateErrorDetail(error: unknown): string {
+  if (typeof error === "string") return error;
+  if (error instanceof Error) return error.message;
+  return "";
+}
+
 export async function installAvailableUpdate(asset: GithubReleaseAsset): Promise<void> {
   if (!isTauriDesktop()) {
     throw new Error("Desktop app required");

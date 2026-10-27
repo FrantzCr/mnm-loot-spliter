@@ -1,8 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Main register window",
+  "description": "Main register window. The UI is served by the bundled local server (14721 packaged, 4721 dev), which Tauri treats as a remote origin: it must be listed here or every app command (install_update) is denied.",
   "windows": ["main"],
+  "remote": {
+    "urls": ["http://127.0.0.1:14721/*", "http://127.0.0.1:4721/*"]
+  },
   "permissions": [
     "core:default",
     "core:app:allow-version",

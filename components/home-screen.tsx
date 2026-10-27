@@ -20,6 +20,7 @@ import {
   evaluateUpdate,
   fetchLatestRelease,
   installAvailableUpdate,
+  updateErrorDetail,
   isTauriDesktop,
   loadRunningAppVersion,
   type AppVersionInfo,
@@ -142,8 +143,9 @@ export function HomeScreen() {
     setUpdateError(null);
     try {
       await installAvailableUpdate(updateResult.asset);
-    } catch {
-      setUpdateError(copy.home.updatesInstallFailed);
+    } catch (error) {
+      const detail = updateErrorDetail(error);
+      setUpdateError(detail ? `${copy.home.updatesInstallFailed} (${detail})` : copy.home.updatesInstallFailed);
       setInstallBusy(false);
     }
   }

@@ -311,15 +311,22 @@ fn show_startup_error(app: &AppHandle, error: &str) {
 }
 
 /// Download a GitHub release setup.exe and launch NSIS in `/UPDATE` mode, then exit.
+/// Async + blocking pool: a 30 MB download must not freeze the window.
 #[tauri::command]
-fn install_update(app: AppHandle, url: String, file_name: String) -> Result<(), String> {
+async fn install_update(app: AppHandle, url: String, file_name: String) -> Result<(), String> {
+  tauri::async_runtime::spawn_blocking(move || install_update_blocking(&app, &url, &file_name))
+    .await
+    .map_err(|error| format!("Update task failed: {error}"))?
+}
+
+fn install_update_blocking(app: &AppHandle, url: &str, file_name: &str) -> Result<(), String> {
   if !(url.starts_with("https://github.com/")
     || url.starts_with("https://objects.githubusercontent.com/")
     || url.starts_with("https://release-assets.githubusercontent.com/"))
   {
     return Err("Update URL must be a GitHub release asset.".into());
   }
-  let safe_name = Path::new(&file_name)
+  let safe_name = Path::new(file_name)
     .file_name()
     .and_then(|n| n.to_str())
     .filter(|n| n.ends_with(".exe") && !n.contains(".."))
@@ -329,7 +336,7 @@ fn install_update(app: AppHandle, url: String, file_name: String) -> Result<(), 
   fs::create_dir_all(&temp_dir).map_err(|e| format!("Could not create temp dir: {e}"))?;
   let dest = temp_dir.join(safe_name);
 
-  download_https_file(&url, &dest)?;
+  download_https_file(url, &dest)?;
 
   let mut command = Command::new(&dest);
   // Tauri NSIS: update mode skips some first-run prompts and replaces in place.
@@ -356,11 +363,19 @@ fn download_https_file(url: &str, dest: &Path) -> Result<(), String> {
   {
     let dest_str = dest.to_string_lossy().replace('\'', "''");
     let url_str = url.replace('\'', "''");
+    // Windows PowerShell 5.1: force TLS 1.2 (GitHub) and hide the progress bar, which otherwise
+    // slows Invoke-WebRequest to a crawl on large files.
     let script = format!(
-      "Invoke-WebRequest -Uri '{url_str}' -OutFile '{dest_str}' -UseBasicParsing"
+      "$ProgressPreference='SilentlyContinue'; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '{url_str}' -OutFile '{dest_str}' -UseBasicParsing"
     );
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     let status = Command::new("powershell.exe")
       .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+      .stdin(Stdio::null())
+      .stdout(Stdio::null())
+      .stderr(Stdio::null())
+      .creation_flags(CREATE_NO_WINDOW)
       .status()
       .map_err(|e| format!("Download failed to start: {e}"))?;
     if !status.success() {

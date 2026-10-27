@@ -9,6 +9,7 @@ import {
   evaluateUpdate,
   fetchLatestRelease,
   installAvailableUpdate,
+  updateErrorDetail,
   isTauriDesktop,
   isUpdateDismissed,
   loadRunningAppVersion,
@@ -75,8 +76,9 @@ export function UpdateBanner() {
     setError(null);
     try {
       await installAvailableUpdate(offer.asset);
-    } catch {
-      setError(copy.home.updatesInstallFailed);
+    } catch (error) {
+      const detail = updateErrorDetail(error);
+      setError(detail ? `${copy.home.updatesInstallFailed} (${detail})` : copy.home.updatesInstallFailed);
       setInstalling(false);
     }
   }
