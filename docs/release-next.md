@@ -50,10 +50,10 @@
 
 | ID | Item | Status |
 |----|------|--------|
-| E1 | Left rail: members, horizontal bar = % vs fair-share / total items | pending |
-| E2 | Clear +/− (owes / owed) coloring and amounts | pending |
-| E3 | Horizontal hold-vs-share diagram | pending |
-| E4 | Larger player recap cards | pending |
+| E1 | Left rail: members, horizontal bar = % vs fair-share / total items | done |
+| E2 | Clear +/− (owes / owed) coloring and amounts | done |
+| E3 | Horizontal hold-vs-share diagram | done |
+| E4 | Larger player recap cards | done |
 
 ## Implementation notes (chosen approaches)
 
@@ -93,4 +93,6 @@
 - **2026-10-27** — C committed (`46f6e1e`).
 - **2026-10-27** — D1–D3: schema 9 — `parties.name` (≤60 chars, null = "Group of <date>" label) and `parties.closed_at` (backfilled from `updated_at` for old closed rows). Status values stay `open` | `closed` in DB ("active" in UI). `readParty(db, partyId?)` reads archives; `PartyView.parties` lists all groups for the switcher; `renameParty` + `PATCH /api/group {id, name}`; `GET /api/group?id=`. UI: `components/group-switcher.tsx` (`GroupBar`: name + inline rename + "Show" select of active/closed) and `ArchivedGroup` in `group-screen` (read-only split via `SplitResult readOnly`, stacked loot). Mutations still only hit the open party. Test: `lib/multi-group.test.ts`.
 - **Not done in D:** naming a group at start (start form has no name field; rename right after works).
-- **Next:** E (left rail with fair-share bars, +/− colors, hold-vs-share diagram, bigger recap cards).
+- **2026-10-27** — D committed (`2b49ff9`).
+- **2026-10-27** — E1–E4: `components/split-visuals.tsx` — `MemberRail` (Overview left rail ≥lg, sticky; stacks on top below lg): per member % of item worth vs fair %, `HoldShareBar` and signed `BalanceChip`. `HoldShareBar`: solid = held up to share, red hatched = held above share (to give), dashed green = missing to share (to receive), tick = fair share. "What each person holds" now uses `PlayerRecapCard` (border tinted by balance, shared bar scale across players). Archived groups get the cards too (via `SplitResult`). Old `HoldCoinRow`/`HoldBalanceRow` removed. Checked at 1280, 800 and 375 px (no horizontal scroll).
+- **Next:** full QA pass on the packaged desktop build (`npm run desktop:prepare` + `tauri build`), then version bump (0.2.0: schema 7→9, new IA) and release.

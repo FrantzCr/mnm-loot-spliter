@@ -54,6 +54,7 @@ import {
 } from "@/lib/settlement-chat";
 import { ChatRoundPicker } from "@/components/chat-round-toggle";
 import { GroupBar } from "@/components/group-switcher";
+import { MemberRail, PlayerRecapCard } from "@/components/split-visuals";
 import type { PartySummary } from "@/lib/group";
 import { cn } from "cn";
 import {
@@ -872,7 +873,21 @@ export function GroupScreen() {
         className="grid gap-4"
       >
 
-      {screenTab === "overview" && showUnpricedHint ? (
+      {screenTab === "overview" ? (
+        <div
+          className={cn(
+            "grid gap-4",
+            party && view?.split ? "lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start" : undefined,
+          )}
+        >
+          {party && view?.split ? (
+            <MemberRail
+              members={settlementMembers(view.split.balances)}
+              totalCopper={settlementMembers(view.split.balances).reduce((sum, row) => sum + row.lootedCopper, 0)}
+            />
+          ) : null}
+          <div className="grid min-w-0 gap-4">
+      {showUnpricedHint ? (
         <Alert>
           <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
             <span>{copy.group.overviewUnpricedHint(unpricedLootCount)}</span>
@@ -883,7 +898,7 @@ export function GroupScreen() {
         </Alert>
       ) : null}
 
-      {screenTab === "overview" && view ? (
+      {view ? (
         <Card>
           <CardHeader className={party ? "gap-2" : undefined}>
             {party ? (
@@ -1238,6 +1253,19 @@ export function GroupScreen() {
         </Card>
       ) : null}
 
+      {view?.split ? (
+        <SplitResult
+          split={view.split}
+          lines={lines}
+          saving={saving}
+          onMode={(mode) => void chooseMode(mode)}
+          onSettleEveryone={() => void settleEveryone()}
+        />
+      ) : null}
+          </div>
+        </div>
+      ) : null}
+
       {screenTab === "loot" && !party ? (
         <p className="text-sm text-muted-foreground">{copy.group.lootNoGroup}</p>
       ) : null}
@@ -1480,15 +1508,6 @@ export function GroupScreen() {
         </Card>
       ) : null}
 
-      {screenTab === "overview" && view?.split ? (
-        <SplitResult
-          split={view.split}
-          lines={lines}
-          saving={saving}
-          onMode={(mode) => void chooseMode(mode)}
-          onSettleEveryone={() => void settleEveryone()}
-        />
-      ) : null}
 
       {leaving && view?.split ? (
         <LeaveDialog
@@ -1736,6 +1755,8 @@ function SplitResult({
   const transfers = split.mode === "value" ? split.transfers : settleEveryone(members);
   const settled = split.mode === "value" ? split.settled : [];
   const everyoneEven = members.every((row) => row.balanceCopper === 0);
+  // One scale for every recap bar so lengths compare across players.
+  const recapScale = Math.max(1, ...members.map((row) => Math.max(row.lootedCopper, row.shareCopper)));
   // Item loot only — corpse coins are already split in-game and must not feed /split or primary totals.
   const { lootCopper } = potSessionTotals(lines);
   const gameSplitCommand = splitCommand(lootCopper);
@@ -1986,16 +2007,9 @@ function SplitResult({
 
         <div className="grid gap-2">
           <h4 className="font-heading text-sm font-medium">{copy.group.eachHolds}</h4>
-          <ul className="grid gap-3 text-sm md:grid-cols-2 md:gap-x-6">
+          <ul className="grid gap-3 md:grid-cols-2">
             {members.map((row) => (
-              <li key={row.key} className="grid gap-1 border-b border-border pb-3">
-                <span className="font-heading text-base font-medium">{row.name}</span>
-                <div className="grid gap-0.5 text-muted-foreground">
-                  <HoldCoinRow label={copy.group.inHand} copper={row.lootedCopper} />
-                  <HoldCoinRow label={copy.group.share} copper={row.shareCopper} />
-                  <HoldBalanceRow balance={row.balanceCopper} copy={copy} />
-                </div>
-              </li>
+              <PlayerRecapCard key={row.key} row={row} scale={recapScale} />
             ))}
           </ul>
         </div>
@@ -2246,46 +2260,6 @@ function RecentPlayersBesideAdd({
 }
 
 /** Label left, fixed coin strip right — icons share columns across every hold line / character. */
-function HoldCoinRow({ label, copper }: { label: string; copper: number }) {
-  return (
-    <div className="grid grid-cols-[minmax(0,1fr)_12.5rem] items-center gap-x-2">
-      <span className="min-w-0 truncate">{label}</span>
-      <CoinAmount copper={copper} aligned className="justify-self-end" />
-    </div>
-  );
-}
-
-function HoldBalanceRow({ balance, copy }: { balance: number; copy: Copy }) {
-  if (balance === 0) {
-    return (
-      <div className="grid grid-cols-[minmax(0,1fr)_12.5rem] items-center gap-x-2">
-        <span className="font-medium text-muted-foreground">{copy.group.settled}</span>
-        <CoinAmount copper={0} aligned className="justify-self-end" />
-      </div>
-    );
-  }
-
-  const owe = balance > 0;
-  const Icon = owe ? BanknoteArrowUp : BanknoteArrowDown;
-  const label = owe ? copy.group.owes("").trimEnd() : copy.group.receives("").trimEnd();
-  const copper = Math.abs(balance);
-
-  return (
-    <div
-      className={cn(
-        "grid grid-cols-[minmax(0,1fr)_12.5rem] items-center gap-x-2 text-base font-medium",
-        owe ? "text-destructive" : "text-[#2f5d3a]",
-      )}
-    >
-      <span className="inline-flex min-w-0 items-center gap-1.5 truncate">
-        <Icon className="size-5 shrink-0" aria-hidden />
-        <span className="truncate">{label}</span>
-      </span>
-      <CoinAmount copper={copper} aligned className="justify-self-end text-base font-semibold" />
-    </div>
-  );
-}
-
 function splitCommand(copper: number): string {
   const parts = copperToCoins(copper);
   return `/split ${parts.platinum} ${parts.gold} ${parts.silver} ${parts.copper}`;
