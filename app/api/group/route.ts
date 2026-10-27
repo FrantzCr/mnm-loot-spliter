@@ -1,6 +1,6 @@
 import { ErrorCode } from "@/lib/codes";
 import { getDb } from "@/lib/db";
-import { readParty, resetParty, startParty, type PartyMemberInput } from "@/lib/group";
+import { readParty, resetPot, startParty, type PartyMemberInput } from "@/lib/group";
 import { jsonError, readJson, routeError } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -40,7 +40,7 @@ function memberInput(value: unknown): PartyMemberInput[] {
 
 export async function DELETE() {
   try {
-    return Response.json(resetParty());
+    return Response.json(resetPot());
   } catch (error) {
     return routeError(error);
   }

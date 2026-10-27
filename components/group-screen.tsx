@@ -46,7 +46,13 @@ import {
   type SplitComputation,
   type SplitMode,
 } from "@/lib/split";
-import { buildSettlementChatMessages } from "@/lib/settlement-chat";
+import {
+  buildSettlementChatMessages,
+  normalizeChatRoundStep,
+  readStoredChatRoundStep,
+  writeStoredChatRoundStep,
+} from "@/lib/settlement-chat";
+import { ChatRoundPicker } from "@/components/chat-round-toggle";
 import { cn } from "cn";
 import {
   stackLootLines,
@@ -646,11 +652,19 @@ export function GroupScreen() {
     );
   });
   const lines = view?.lines ?? [];
-  const knownValue = lines.reduce((sum, line) => sum + (line.unitCopper == null ? 0 : line.quantity * line.unitCopper), 0);
-  const missing = lines.filter((line) => line.unitCopper == null).length;
-  const unpricedLootCount = lines.filter(
+  // Item loot only — corpse coins stay out of primary worth / /split (see docs/release-next.md).
+  const { lootCopper: knownValue } = potSessionTotals(lines);
+  const missing = lines.filter(
     (line) => line.unitCopper == null && !isCorpseCoins(line.itemName),
   ).length;
+  const unpricedLootCount = missing;
+  // After Record everyone (no remaining tips), drop unpriced noise from Overview.
+  const splitSettledQuiet =
+    !!view?.split &&
+    view.split.mode === "value" &&
+    view.split.transfers.length === 0 &&
+    view.split.settled.length > 0;
+  const showUnpricedOverview = unpricedLootCount > 0 && !splitSettledQuiet;
 
   function dismissClose() {
     if (saving) return;
@@ -688,12 +702,14 @@ export function GroupScreen() {
   const allActiveLoot = stackLootLinesAcrossPeople(
     lines.filter((line) => activeLootPersonIds.has(line.personId)),
   );
-  /** One pass — priced worth per person for compact tab labels. */
+  /** One pass — priced item worth per person for compact tab labels (no corpse coins). */
   const lootWorthByPerson = new Map<string, number>();
   for (const line of lines) {
-    if (line.unitCopper == null) continue;
-    const add = isCorpseCoins(line.itemName) ? line.unitCopper : line.quantity * line.unitCopper;
-    lootWorthByPerson.set(line.personId, (lootWorthByPerson.get(line.personId) ?? 0) + add);
+    if (line.unitCopper == null || isCorpseCoins(line.itemName)) continue;
+    lootWorthByPerson.set(
+      line.personId,
+      (lootWorthByPerson.get(line.personId) ?? 0) + line.quantity * line.unitCopper,
+    );
   }
   let allActiveLootWorth = 0;
   for (const personId of activeLootPersonIds) {
@@ -1116,7 +1132,7 @@ export function GroupScreen() {
                     text={copy.group.potCollapsedSummary(lines.length, COIN_SLOT)}
                     amounts={[knownValue]}
                   />
-                  {unpricedLootCount > 0 ? (
+                  {showUnpricedOverview ? (
                     <>
                       {" · "}
                       {copy.group.potCollapsedUnpriced(unpricedLootCount)}
@@ -1133,6 +1149,7 @@ export function GroupScreen() {
             ) : (
               <>
                 {(() => {
+                  if (!showUnpricedOverview) return null;
                   const unpricedLoot = stackLootLinesAcrossPeople(
                     lines.filter((line) => line.unitCopper == null && !isCorpseCoins(line.itemName)),
                   );
@@ -1517,28 +1534,28 @@ function SplitResult({
 }) {
   const { copy } = useI18n();
   const [splitOpen, setSplitOpen] = useState(true);
+  // AfterMount gates first paint, so reading localStorage in the initializer is hydration-safe.
+  const [roundCopper, setRoundCopper] = useState(readStoredChatRoundStep);
+  const [shareTab, setShareTab] = useState<"chat" | "split">("chat");
   const members = settlementMembers(split.balances);
   const transfers = split.mode === "value" ? split.transfers : settleEveryone(members);
   const settled = split.mode === "value" ? split.settled : [];
   const everyoneEven = members.every((row) => row.balanceCopper === 0);
-  // Same pot lines as "total worth" — don't rely on optional fields from an older server payload.
-  const { lootCopper, splitCoinCopper } = potSessionTotals(lines);
-  const sessionCopper = lootCopper + splitCoinCopper;
-  const gameSplitCommand = splitCommand(
-    lines.reduce((sum, line) => sum + (line.unitCopper == null ? 0 : line.quantity * line.unitCopper), 0),
-  );
+  // Item loot only — corpse coins are already split in-game and must not feed /split or primary totals.
+  const { lootCopper } = potSessionTotals(lines);
+  const gameSplitCommand = splitCommand(lootCopper);
   // Content signature — avoid resetting copy feedback when `transfers` is a new array with the same tips.
   const chatAnnounceKey = transfers
     .map((transfer) => `${transfer.fromPresenceId}>${transfer.toPresenceId}:${transfer.copper}`)
     .join("|");
   const chatMessages = useMemo(
-    () => buildSettlementChatMessages(transfers),
+    () => buildSettlementChatMessages(transfers, { roundCopper }),
     // transfers read inside; key is the stable dependency
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chatAnnounceKey captures tip content
-    [chatAnnounceKey],
+    [chatAnnounceKey, roundCopper],
   );
   const [chatPart, setChatPart] = useState(0);
-  const [announceKeySeen, setAnnounceKeySeen] = useState(chatAnnounceKey);
+  const [announceKeySeen, setAnnounceKeySeen] = useState(`${chatAnnounceKey}|${roundCopper}`);
   const [chatFeedback, setChatFeedback] = useState<string | null>(null);
   const [feedbackOpacity, setFeedbackOpacity] = useState(1);
   const [splitCopied, setSplitCopied] = useState(false);
@@ -1547,6 +1564,12 @@ function SplitResult({
   const ensureValueMode = useEffectEvent(() => {
     onMode("value");
   });
+
+  function applyRoundStep(step: number) {
+    const next = normalizeChatRoundStep(step);
+    setRoundCopper(next);
+    writeStoredChatRoundStep(next);
+  }
 
   /** Fully readable, then fade-out. */
   const COPY_FEEDBACK_HOLD_MS = 3200;
@@ -1566,9 +1589,10 @@ function SplitResult({
     setSplitCopied(false);
   }
 
-  // Reset pager + copy toast when tip list content changes (adjust state during render).
-  if (announceKeySeen !== chatAnnounceKey) {
-    setAnnounceKeySeen(chatAnnounceKey);
+  // Reset pager + copy toast when tip list or rounding changes (adjust state during render).
+  const announceStateKey = `${chatAnnounceKey}|${roundCopper}`;
+  if (announceKeySeen !== announceStateKey) {
+    setAnnounceKeySeen(announceStateKey);
     setChatPart(0);
     setChatFeedback(null);
     setFeedbackOpacity(1);
@@ -1604,7 +1628,7 @@ function SplitResult({
   useEffect(() => {
     clearCopyFeedbackTimers();
     return () => clearCopyFeedbackTimers();
-  }, [chatAnnounceKey]);
+  }, [chatAnnounceKey, roundCopper]);
 
   async function copyChatAnnounce() {
     if (chatMessages.length === 0) return;
@@ -1651,27 +1675,15 @@ function SplitResult({
         closedDescription={
           <CoinPhrase
             text={copy.group.valueSplitCollapsedSummary(COIN_SLOT, transfers.length)}
-            amounts={[sessionCopper]}
+            amounts={[lootCopper]}
           />
         }
       />
       {splitOpen ? (
       <CardContent id="group-split-block" className="grid gap-5">
-        <div className="flex flex-col gap-3 rounded-sm border border-[#6e5338]/55 bg-[#f7f3ea] p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-          <div className="grid min-w-0 flex-1 gap-1.5 text-[0.9375rem] text-muted-foreground">
-            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
-              <span>{copy.group.lootValueTotal}</span>
-              <CoinAmount copper={lootCopper} className="text-[0.9375rem] font-medium text-muted-foreground" />
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
-              <span>{copy.group.coinsAlreadySplit}</span>
-              <CoinAmount copper={splitCoinCopper} className="text-[0.9375rem] font-medium text-muted-foreground" />
-            </div>
-          </div>
-          <div className="grid shrink-0 gap-0.5 border-t border-[#6e5338]/35 pt-2 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-6">
-            <p className="font-heading text-sm font-medium">{copy.group.potTotals}</p>
-            <CoinAmount copper={sessionCopper} className="text-xl font-semibold text-foreground" />
-          </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-[#6e5338]/55 bg-[#f7f3ea] px-3 py-2.5">
+          <p className="font-heading text-sm font-medium text-foreground">{copy.group.lootValueTotal}</p>
+          <CoinAmount copper={lootCopper} className="text-xl font-semibold text-foreground" />
         </div>
 
         <div className="grid gap-2 rounded-sm border-2 border-[#6e5338]/70 bg-[#efe6d6]/50 p-3">
@@ -1705,44 +1717,58 @@ function SplitResult({
           ) : null}
 
           <div className="grid gap-3 border-t border-[#6e5338]/40 pt-3">
-            <div className="grid gap-1.5">
-              <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
-                <p className="font-heading text-sm font-medium">{copy.group.chatAnnounceLabel}</p>
-                {chatMessages.length > 1 ? (
-                  <span className="text-xs text-muted-foreground">
-                    {copy.group.chatAnnouncePart((chatPart % chatMessages.length) + 1, chatMessages.length)}
-                  </span>
-                ) : null}
+            <div className="grid gap-2">
+              <div role="tablist" aria-label={copy.group.shareTitle} className="inline-flex w-fit rounded-sm border border-[#6e5338]/55 bg-card p-0.5">
+                {(["chat", "split"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    role="tab"
+                    aria-selected={shareTab === tab}
+                    onClick={() => setShareTab(tab)}
+                    className={cn(
+                      "rounded-[2px] px-3 py-1 font-heading text-sm transition-colors",
+                      shareTab === tab ? "bg-[#6e5338] text-[#f7f3ea]" : "text-muted-foreground hover:bg-[#efe6d6]",
+                    )}
+                  >
+                    {tab === "chat" ? copy.group.shareTabChat : copy.group.shareTabSplit}
+                  </button>
+                ))}
               </div>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-                <p className="min-w-0 flex-1 rounded-sm border border-[#6e5338]/35 bg-card px-2.5 py-2 font-mono text-xs leading-snug break-words text-foreground">
-                  {chatMessages[chatPart % chatMessages.length] ?? ""}
-                </p>
+              {shareTab === "chat" ? (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span>{copy.group.chatRoundLabel}</span>
+                  <ChatRoundPicker
+                    value={roundCopper}
+                    onChange={applyRoundStep}
+                    label={copy.group.chatRoundLabel}
+                    customLabel={copy.group.chatRoundCustom}
+                    customPlaceholder={copy.group.chatRoundCustomPlaceholder}
+                    customApply={copy.group.chatRoundCustomApply}
+                  />
+                </div>
+              ) : null}
+              <p className="min-h-16 rounded-sm border border-[#6e5338]/35 bg-card px-3 py-2.5 font-mono text-sm leading-relaxed break-words text-foreground">
+                {shareTab === "chat" ? (chatMessages[chatPart % chatMessages.length] ?? "") : gameSplitCommand}
+              </p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {shareTab === "chat"
+                    ? chatMessages.length > 1
+                      ? `${copy.group.chatAnnouncePart((chatPart % chatMessages.length) + 1, chatMessages.length)} · ${copy.group.chatRoundHelp}`
+                      : copy.group.chatRoundHelp
+                    : copy.group.splitCommandHelp}
+                </span>
                 <Button
                   type="button"
-                  variant="outline"
-                  className="shrink-0 self-stretch sm:self-start"
-                  disabled={chatMessages.length === 0}
-                  onClick={() => void copyChatAnnounce()}
+                  disabled={shareTab === "chat" && chatMessages.length === 0}
+                  onClick={() => void (shareTab === "chat" ? copyChatAnnounce() : copyGameSplitCommand())}
                 >
-                  {copy.group.copyChatAnnounce}
-                </Button>
-              </div>
-            </div>
-
-            <div className="grid gap-1.5">
-              <p className="font-heading text-sm font-medium">{copy.group.splitCommandLabel}</p>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-                <p className="min-w-0 flex-1 rounded-sm border border-[#6e5338]/35 bg-card px-2.5 py-2 font-mono text-xs leading-snug text-foreground">
-                  {gameSplitCommand}
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="shrink-0 self-stretch sm:self-start"
-                  onClick={() => void copyGameSplitCommand()}
-                >
-                  {splitCopied ? copy.common.copied : copy.group.copySplitCommand}
+                  {shareTab === "chat"
+                    ? copy.group.copyChatAnnounce
+                    : splitCopied
+                      ? copy.common.copied
+                      : copy.group.copySplitCommand}
                 </Button>
               </div>
             </div>

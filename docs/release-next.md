@@ -1,0 +1,91 @@
+# Next release plan (post-0.1.4)
+
+**Status:** in progress  
+**Target:** **one fat release** (`0.2.0` if schema/UI warrants, else `0.1.5`) — pack A–E together; full QA at the end.  
+**Owner notes (Frantz, 2026-10-27):** agent decides UI; pack max in one ship; resume from this file if context drops.
+
+## Locked decisions
+
+1. **Recap / totals UI** — Agent chooses best UI. Rule: corpse coins (`Coins already split`) must **not** enter player/session totals used for fair share, `/split`, or the main “worth” figure. Coins may stay as a small optional footnote only if useful; default = hide from primary numbers.
+2. **Reset pot** — Keeps roster + group name. Loot from the cleared session must be **invisible in the group UI** and **excluded from all split math** (not merely collapsed). Implementation: `session_epoch` (or equivalent) on the party; loot tagged with epoch; Reset bumps epoch so old lines drop out of queries. Do **not** delete ledger history globally.
+3. **Close group** — Not a soft “pause”. Closing **archives** the group: window/view stays available with **name, loot snapshot, proposed splits** (read-only). User can **open another active group** alongside archived ones. Only the **active** group receives new `group_id` attachments.
+4. **Chat rounding** — Default **1 silver**. User can pick **any step** (presets 1c/5c/10c/1s/5s/1g + free input like `25c`, `2s`, `1g 5s`). Same picker in Options and on the Share card (localStorage `mnm-chat-round-copper`).
+
+## Scope checklist
+
+### A — Correctness & desktop hardens
+
+| ID | Item | Status |
+|----|------|--------|
+| A1 | `/split` uses **item loot copper only** (`lootCopper`), never corpse coins | done |
+| A2 | Primary totals / player recap cards use items only; coins out of main calc/display | done |
+| A3 | After **Record everyone's settlements**, hide unpriced-at-0 / unpriced session block from Overview | done |
+| A4 | **Single-instance** Tauri (2nd launch focuses existing window) | done |
+| A5 | Blank Options/Prices: prepare smoke for `/options`+`/prices`+chunk existence; client recovery if chunk load fails | done |
+
+### B — Share UX & reset
+
+| ID | Item | Status |
+|----|------|--------|
+| B1 | Share card: tabs Group chat \| `/split`, big preview, one Copy, part 1/N | done |
+| B2 | Rounding picker (presets + any custom step, default 1s) on Share card + Options | done |
+| B3 | **Reset pot** (epoch bump; loot invisible + out of math; roster kept) | done (manual QA on real data pending) |
+
+### C — Information architecture
+
+| ID | Item | Status |
+|----|------|--------|
+| C1 | Group tabs: **Overview** \| **Loot** \| **To sell** (Waiting to sell out of Overview) | pending |
+| C2 | Unpriced list lives under Loot (or Prices), not sticky on Overview after settle | pending |
+
+### D — Multi-group + naming
+
+| ID | Item | Status |
+|----|------|--------|
+| D1 | `parties.name` (user-editable) | pending |
+| D2 | Statuses: `active` \| `closed` (archived view). One `active` max. Closed keeps loot + last split proposal readable | pending |
+| D3 | “New group” while another is closed/archived; switcher to reopen archived views | pending |
+
+### E — Group visual refonte
+
+| ID | Item | Status |
+|----|------|--------|
+| E1 | Left rail: members, horizontal bar = % vs fair-share / total items | pending |
+| E2 | Clear +/− (owes / owed) coloring and amounts | pending |
+| E3 | Horizontal hold-vs-share diagram | pending |
+| E4 | Larger player recap cards | pending |
+
+## Implementation notes (chosen approaches)
+
+### Coins out of calc
+- Keep ingesting act_14 for audit if useful later, but **Overview math** and `/split` use `lootCopper` / non-coin lines only.
+- `potSessionTotals` already splits `lootCopper` vs `splitCoinCopper` — stop summing them into primary UI and `splitCommand`.
+
+### Reset pot
+- Add `parties.session_epoch INTEGER NOT NULL DEFAULT 0` (or `pot_generation`).
+- Loot rows store `session_epoch` at attach time (or party stores epoch and queries `l.session_epoch = p.session_epoch`).
+- Reset: `UPDATE parties SET session_epoch = session_epoch + 1`, clear `party_settlements` for current epoch (or all for party), do not destroy presence rows.
+
+### Archived close + new group
+- `closeParty`: set `status = 'closed'`, keep `group_id` on loot, persist last mode + allow reading split from closed party id.
+- UI: group switcher (active + closed). Active receives scans; closed is read-only detail.
+- `startParty`: requires no other `active` (closed OK).
+
+### Single-instance
+- Prefer official Tauri 2 single-instance plugin; on duplicate launch, focus `main`.
+
+### Blank pages
+- Extend `prepare-desktop.mjs` smoke: fetch `/`, `/group`, `/prices`, `/options` and assert every `/_next/static/chunks/*` ref exists on disk.
+- Optional: client error boundary → hard navigation on ChunkLoadError.
+
+## Progress log
+
+- **2026-10-27** — Plan locked with Frantz decisions; file created. Implementation starting A→E in one release track.
+- **2026-10-27** — A1/A2: `group-screen` known worth, tab labels, split header, and `/split` use `lootCopper` only; removed coins-already-split from primary split totals UI.
+- **2026-10-27** — A3: hide Overview unpriced block when value split is fully settled.
+- **2026-10-27** — A4: `tauri-plugin-single-instance` focuses existing `main` window on 2nd launch.
+- **2026-10-27** — A5 (partial): prepare-desktop smoke now checks `/group`, `/prices`, `/options` chunk files on disk.
+- **2026-10-27** — A5 done: `lib/chunk-recovery.ts` + `app/error.tsx` / new `app/global-error.tsx` hard-reload once per path on ChunkLoadError (sessionStorage guard), then fall back to error UI.
+- **2026-10-27** — B1/B2: Share block is now tabs (Group chat \| /split) with one preview + one Copy; `components/chat-round-toggle.tsx` (`ChatRoundPicker`) used on Share card and in Options. Rounding = any step (Frantz: "toute valeur").
+- **2026-10-27** — B3: schema 8 — `parties.session_epoch`, `parties.pot_started_at`, `loot_entries.group_epoch`, `party_settlements.session_epoch`. `resetPot` replaces `resetParty` (DELETE /api/group): bumps epoch, clears settled_at, keeps presences. Loot looted before `pot_started_at` but read late lands in the previous (hidden) epoch. Close→resale only enqueues current-epoch loot. Test: `lib/reset-pot.test.ts`.
+- **Next:** C1/C2 (tabs Overview | Loot | To sell), then D (multi-group), E (visual).

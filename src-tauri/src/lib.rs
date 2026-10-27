@@ -382,7 +382,18 @@ fn download_https_file(url: &str, dest: &Path) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  tauri::Builder::default()
+  // single-instance must register first so a second launch exits before spawning another sidecar.
+  let mut builder = tauri::Builder::default().plugin(tauri_plugin_single_instance::init(
+    |app, _args, _cwd| {
+      if let Some(main) = app.get_webview_window("main") {
+        let _ = main.unminimize();
+        let _ = main.set_focus();
+        let _ = main.show();
+      }
+    },
+  ));
+
+  builder = builder
     .manage(SidecarState(Mutex::new(None)))
     .invoke_handler(tauri::generate_handler![install_update])
     .setup(|app| {
@@ -435,7 +446,9 @@ pub fn run() {
         let state = window.app_handle().state::<SidecarState>();
         stop_sidecar(&state);
       }
-    })
+    });
+
+  builder
     .run(tauri::generate_context!())
     .expect("error while building tauri application");
 }

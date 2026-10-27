@@ -10,6 +10,12 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ChatRoundPicker } from "@/components/chat-round-toggle";
+import {
+  normalizeChatRoundStep,
+  readStoredChatRoundStep,
+  writeStoredChatRoundStep,
+} from "@/lib/settlement-chat";
 import {
   evaluateUpdate,
   fetchLatestRelease,
@@ -45,6 +51,13 @@ export function HomeScreen() {
   const [installBusy, setInstallBusy] = useState(false);
   const [updateResult, setUpdateResult] = useState<UpdateCheckResult | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [roundCopper, setRoundCopper] = useState(readStoredChatRoundStep);
+
+  function applyRoundStep(step: number) {
+    const next = normalizeChatRoundStep(step);
+    setRoundCopper(next);
+    writeStoredChatRoundStep(next);
+  }
 
   const load = useCallback(async () => {
     try {
@@ -191,6 +204,23 @@ export function HomeScreen() {
           ) : (
             <p className="text-sm text-muted-foreground">{copy.home.noScan}</p>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle as="h3">{copy.home.chatRoundTitle}</CardTitle>
+          <CardDescription>{copy.home.chatRoundBody}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ChatRoundPicker
+            value={roundCopper}
+            onChange={applyRoundStep}
+            label={copy.home.chatRoundTitle}
+            customLabel={copy.group.chatRoundCustom}
+            customPlaceholder={copy.group.chatRoundCustomPlaceholder}
+            customApply={copy.group.chatRoundCustomApply}
+          />
         </CardContent>
       </Card>
 

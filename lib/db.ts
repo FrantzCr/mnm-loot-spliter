@@ -10,7 +10,7 @@ import { unitPriceFromSale } from "./sale-price";
 
 const globalForDb = globalThis as unknown as { registreDb?: DatabaseSync; registreSchema?: number };
 
-const SCHEMA = 7;
+const SCHEMA = 8;
 
 const APP_DATA_DIR = "mnm-loot-spliter";
 const LEGACY_APP_DATA_DIRS = ["loot-spliter"] as const;
@@ -215,6 +215,22 @@ function migrate(db: DatabaseSync) {
   if (!peopleColumns.some((column) => column.name === "on_machine")) {
     db.exec("ALTER TABLE people ADD COLUMN on_machine INTEGER NOT NULL DEFAULT 0");
   }
+  // Reset pot: loot/settlements are tagged with the party's session epoch; bumping it hides the old pot.
+  const partyColumns = db.prepare("PRAGMA table_info(parties)").all() as Array<{ name: string }>;
+  if (!partyColumns.some((column) => column.name === "session_epoch")) {
+    db.exec("ALTER TABLE parties ADD COLUMN session_epoch INTEGER NOT NULL DEFAULT 0");
+  }
+  if (!partyColumns.some((column) => column.name === "pot_started_at")) {
+    db.exec("ALTER TABLE parties ADD COLUMN pot_started_at TEXT");
+  }
+  const lootEpochColumns = db.prepare("PRAGMA table_info(loot_entries)").all() as Array<{ name: string }>;
+  if (!lootEpochColumns.some((column) => column.name === "group_epoch")) {
+    db.exec("ALTER TABLE loot_entries ADD COLUMN group_epoch INTEGER NOT NULL DEFAULT 0");
+  }
+  const settlementColumns = db.prepare("PRAGMA table_info(party_settlements)").all() as Array<{ name: string }>;
+  if (!settlementColumns.some((column) => column.name === "session_epoch")) {
+    db.exec("ALTER TABLE party_settlements ADD COLUMN session_epoch INTEGER NOT NULL DEFAULT 0");
+  }
   backfillPresence(db);
 }
 
@@ -320,15 +336,26 @@ export function invalidateSocialFiles(db: DatabaseSync) {
   }
 }
 
-function groupForLoot(
-  party: { id: string; started_at: string } | undefined,
+type OpenPartyForLoot = {
+  id: string;
+  started_at: string;
+  session_epoch: number | bigint;
+  pot_started_at: string | null;
+};
+
+/** Attach loot to the open party; loot from before a Reset pot lands in the previous (hidden) epoch. */
+export function groupForLoot(
+  party: OpenPartyForLoot | undefined,
   lootedAt: string,
-): string | null {
-  if (!party) return null;
+): { groupId: string | null; epoch: number } {
+  if (!party) return { groupId: null, epoch: 0 };
   const at = Date.parse(lootedAt);
   const start = Date.parse(party.started_at);
-  if (Number.isNaN(at) || Number.isNaN(start) || at < start) return null;
-  return party.id;
+  if (Number.isNaN(at) || Number.isNaN(start) || at < start) return { groupId: null, epoch: 0 };
+  const epoch = asNumber(party.session_epoch);
+  const potStart = party.pot_started_at ? Date.parse(party.pot_started_at) : NaN;
+  if (!Number.isNaN(potStart) && at < potStart) return { groupId: party.id, epoch: epoch - 1 };
+  return { groupId: party.id, epoch };
 }
 
 export function ingestLoot(db: DatabaseSync, events: ParsedLoot[]): IngestResult {
@@ -337,14 +364,14 @@ export function ingestLoot(db: DatabaseSync, events: ParsedLoot[]): IngestResult
   const suppressedStmt = db.prepare("SELECT 1 AS hit FROM suppressed_loot WHERE dedupe_key = ?");
   const existingStmt = db.prepare("SELECT 1 AS hit FROM loot_entries WHERE dedupe_key = ?");
   const findPerson = db.prepare("SELECT id FROM people WHERE character_key = ?");
-  const openParty = db.prepare("SELECT id, started_at FROM parties WHERE status = 'open'").get() as
-    | { id: string; started_at: string }
-    | undefined;
+  const openParty = db
+    .prepare("SELECT id, started_at, session_epoch, pot_started_at FROM parties WHERE status = 'open'")
+    .get() as OpenPartyForLoot | undefined;
   const insertLoot = db.prepare(
     `INSERT INTO loot_entries (
        id, dedupe_key, person_id, item_name, item_key, quantity, looted_at,
-       source, zone, note, unit_copper, user_edited, created_at, updated_at, group_id
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 0, ?, ?, ?)
+       source, zone, note, unit_copper, user_edited, created_at, updated_at, group_id, group_epoch
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 0, ?, ?, ?, ?)
      ON CONFLICT(dedupe_key) DO NOTHING`,
   );
 
@@ -365,6 +392,7 @@ export function ingestLoot(db: DatabaseSync, events: ParsedLoot[]): IngestResult
       if (!person) continue;
       const unitCopper =
         event.unitCopper != null && isValidCopper(event.unitCopper) ? event.unitCopper : null;
+      const group = groupForLoot(openParty, event.lootedAt);
       const info = insertLoot.run(
         crypto.randomUUID(),
         event.dedupeKey,
@@ -378,7 +406,8 @@ export function ingestLoot(db: DatabaseSync, events: ParsedLoot[]): IngestResult
         unitCopper,
         now,
         now,
-        groupForLoot(openParty, event.lootedAt),
+        group.groupId,
+        group.epoch,
       );
       if (Number(info.changes) > 0) result.added += 1;
       else result.duplicate += 1;

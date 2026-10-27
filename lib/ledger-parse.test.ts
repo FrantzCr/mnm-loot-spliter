@@ -187,6 +187,7 @@ describe("parseLedgerDocument", () => {
               d12: Buffer.from("0,0,0,29", "utf8").toString("base64"),
               d13: mob,
               d14: "party_split",
+              // Observer share after auto-split — must NOT replace d11.
               d15: "0,0,0,5",
             }),
             f04: "2026-10-20T10:58:47+02:00",
@@ -221,10 +222,40 @@ describe("parseLedgerDocument", () => {
     assert.equal(report.loot.length, 2);
     assert.equal(report.loot[0].itemName, COIN_LOOT_ITEM_NAME);
     assert.equal(report.loot[0].characterName, "Brachus");
+    // Full corpse pile (d11), not the observer share in d15 (5).
     assert.equal(report.loot[0].unitCopper, 29);
     assert.equal(report.loot[0].source, "a restless skeleton");
     assert.equal(report.loot[1].characterName, "Aby");
     assert.equal(report.loot[1].unitCopper, 49);
     assert.equal(report.sales.length, 0);
+  });
+
+  it("keeps party_split d11 as the full corpse total when d15 is a smaller share", () => {
+    // Real Social pattern: d11/d15 ≈ party size (e.g. 65/13 = 5).
+    const mob = Buffer.from("a wererat", "utf8").toString("base64");
+    const report = parseLedgerDocument(
+      {
+        c05: "Aby",
+        c01: [
+          {
+            f01: "act_14",
+            f03: JSON.stringify({
+              d11: 65,
+              d12: "0,0,0,65",
+              d13: mob,
+              d14: "party_split",
+              d15: "0,0,0,13",
+            }),
+            f04: "2026-10-08T13:43:27+02:00",
+            f07: "Spilled",
+            f09: "Aby",
+          },
+        ],
+      },
+      { characterFromPath: "Aby", serverFromPath: "vespyra", characterFromFile: "Aby" },
+    );
+    assert.equal(report.loot.length, 1);
+    assert.equal(report.loot[0].unitCopper, 65);
+    assert.notEqual(report.loot[0].unitCopper, 13);
   });
 });

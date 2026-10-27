@@ -16,8 +16,14 @@ import { coinsToCopper, isValidCopper } from "./money";
  * Loot is action code act_13. Quantity is one per event: the public
  * field list does not document a stack size on act_13.
  * Coins taken from a corpse are act_14 ("Interact with a Corpse").
- * Observed fields (not on the public wiki list): d11 = copper total,
- * d12 = "Pp,Gp,Sp,Cp", d13 = mob name, d14 = party_split | npc_corpse.
+ * Observed fields (not on the public wiki list):
+ *   d11 / d12 = FULL corpse copper (Pp,Gp,Sp,Cp) before/as the pile —
+ *     not the looter’s personal pocket after auto-split.
+ *   d13 = mob name, d14 = party_split | npc_corpse.
+ *   d15 = observer’s received share after party auto-split (Social
+ *     party_split only; often ≈ d11 / party size). We intentionally
+ *     persist d11 so "Coins already split in-game" is the session’s
+ *     full corpse-coin pool, attributed to who clicked the corpse.
  * A vendor sale is act_24 ("Sell Item to a Vendor"). On that action the
  * character ledger puts the stack count in d01 and the proceeds in d03,
  * as base64 text "N platinum N gold N silver N copper". The zone is f05.

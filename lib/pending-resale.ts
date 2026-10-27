@@ -76,7 +76,8 @@ export function enqueueGroupResale(partyId: string, db: DatabaseSync = getDb()) 
               END AS unit_copper
        FROM loot_entries l
        LEFT JOIN price_book b ON b.item_key = l.item_key
-       WHERE l.group_id = ?`,
+       JOIN parties p ON p.id = l.group_id
+       WHERE l.group_id = ? AND l.group_epoch = p.session_epoch`,
     )
     .all(partyId) as Array<{
     item_name: string;

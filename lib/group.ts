@@ -62,14 +62,20 @@ export function startParty(db: DatabaseSync = getDb(), members: PartyMemberInput
   return readParty(db);
 }
 
-export function resetParty(db: DatabaseSync = getDb()): PartyView {
-  const open = db.prepare("SELECT id FROM parties WHERE status = 'open'").get() as { id: string } | undefined;
+/**
+ * Reset pot: start a fresh split with the same roster. Bumps the party's session epoch so the
+ * cleared pot's loot and settlements drop out of every group query (ledger rows are kept).
+ */
+export function resetPot(db: DatabaseSync = getDb(), at = new Date().toISOString()): PartyView {
+  const open = openParty(db);
   if (!open) return readParty(db);
   db.exec("BEGIN");
   try {
-    db.prepare("UPDATE loot_entries SET group_id = NULL WHERE group_id = ?").run(open.id);
-    db.prepare("DELETE FROM party_members WHERE party_id = ?").run(open.id);
-    db.prepare("DELETE FROM parties WHERE id = ?").run(open.id);
+    db.prepare(
+      "UPDATE parties SET session_epoch = session_epoch + 1, pot_started_at = ?, updated_at = ? WHERE id = ?",
+    ).run(at, at, open.id);
+    // Roster stays; members who left stay listed but no longer weigh on the new pot.
+    db.prepare("UPDATE party_presence SET settled_at = NULL WHERE party_id = ?").run(open.id);
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");
@@ -119,7 +125,12 @@ export function joinParty(
 }
 
 function defaultJoinAt(db: DatabaseSync, open: { id: string; started_at: string }): string {
-  const loot = db.prepare("SELECT 1 AS hit FROM loot_entries WHERE group_id = ? LIMIT 1").get(open.id) as
+  const loot = db
+    .prepare(
+      `SELECT 1 AS hit FROM loot_entries l JOIN parties p ON p.id = l.group_id
+       WHERE l.group_id = ? AND l.group_epoch = p.session_epoch LIMIT 1`,
+    )
+    .get(open.id) as
     | { hit: number }
     | undefined;
   if (!loot) return open.started_at;
@@ -170,11 +181,11 @@ export function settlePartyPresence(presenceId: string, db: DatabaseSync = getDb
   db.exec("BEGIN");
   try {
     const insert = db.prepare(
-      `INSERT INTO party_settlements (id, party_id, from_presence_id, to_presence_id, copper, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO party_settlements (id, party_id, from_presence_id, to_presence_id, copper, created_at, session_epoch)
+       VALUES (?, ?, ?, ?, ?, ?, (SELECT session_epoch FROM parties WHERE id = ?))`,
     );
     for (const transfer of transfers) {
-      insert.run(crypto.randomUUID(), open.id, transfer.fromPresenceId, transfer.toPresenceId, transfer.copper, now);
+      insert.run(crypto.randomUUID(), open.id, transfer.fromPresenceId, transfer.toPresenceId, transfer.copper, now, open.id);
     }
     db.prepare("UPDATE party_presence SET settled_at = ? WHERE id = ?").run(now, presenceId);
     db.exec("COMMIT");
@@ -203,11 +214,11 @@ export function settlePartyEveryone(db: DatabaseSync = getDb()): PartyView {
   db.exec("BEGIN");
   try {
     const insert = db.prepare(
-      `INSERT INTO party_settlements (id, party_id, from_presence_id, to_presence_id, copper, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO party_settlements (id, party_id, from_presence_id, to_presence_id, copper, created_at, session_epoch)
+       VALUES (?, ?, ?, ?, ?, ?, (SELECT session_epoch FROM parties WHERE id = ?))`,
     );
     for (const transfer of transfers) {
-      insert.run(crypto.randomUUID(), open.id, transfer.fromPresenceId, transfer.toPresenceId, transfer.copper, now);
+      insert.run(crypto.randomUUID(), open.id, transfer.fromPresenceId, transfer.toPresenceId, transfer.copper, now, open.id);
     }
     const mark = db.prepare("UPDATE party_presence SET settled_at = ? WHERE id = ? AND party_id = ?");
     for (const presenceId of involved) {
@@ -249,9 +260,9 @@ export function readParty(db: DatabaseSync = getDb()): PartyView {
     }>
   ).map((row) => ({ id: row.id, name: row.name, serverName: row.server_name }));
 
-  const party = db.prepare("SELECT id, started_at, mode FROM parties WHERE status = 'open'").get() as
-    | { id: string; started_at: string; mode: string | null }
-    | undefined;
+  const party = db
+    .prepare("SELECT id, started_at, mode, session_epoch FROM parties WHERE status = 'open'")
+    .get() as { id: string; started_at: string; mode: string | null; session_epoch: number | bigint } | undefined;
   if (!party) return { party: null, people, lines: [], split: null };
 
   const presences = (
@@ -291,10 +302,10 @@ export function readParty(db: DatabaseSync = getDb()): PartyView {
          FROM loot_entries l
          JOIN people p ON p.id = l.person_id
          LEFT JOIN price_book b ON b.item_key = l.item_key
-         WHERE l.group_id = ?
+         WHERE l.group_id = ? AND l.group_epoch = ?
          ORDER BY CASE WHEN l.looted_at = '' THEN 1 ELSE 0 END, l.looted_at, l.created_at`,
       )
-      .all(party.id) as Array<{
+      .all(party.id, party.session_epoch) as Array<{
       id: string;
       item_name: string;
       quantity: number | bigint;
@@ -318,10 +329,10 @@ export function readParty(db: DatabaseSync = getDb()): PartyView {
       .prepare(
         `SELECT from_presence_id, to_presence_id, copper
          FROM party_settlements
-         WHERE party_id = ?
+         WHERE party_id = ? AND session_epoch = ?
          ORDER BY created_at`,
       )
-      .all(party.id) as Array<{
+      .all(party.id, party.session_epoch) as Array<{
       from_presence_id: string;
       to_presence_id: string;
       copper: number | bigint;

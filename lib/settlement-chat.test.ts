@@ -1,27 +1,46 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { COPPER_PER_GOLD, COPPER_PER_SILVER } from "@/lib/money";
 import {
   EQUITABLE_CHAT_ANNOUNCE,
   GAME_CHAT_MAX,
   buildSettlementChatMessages,
+  formatChatRoundLabel,
   formatCoinsChat,
   formatTransferChat,
+  normalizeChatRoundStep,
+  parseChatRoundInput,
   roundCopperForChat,
 } from "@/lib/settlement-chat";
 
 describe("settlement-chat", () => {
-  it("rounds chat amounts to the nearest silver", () => {
+  it("normalizes round steps to a positive copper integer", () => {
+    assert.equal(normalizeChatRoundStep(0), COPPER_PER_SILVER);
+    assert.equal(normalizeChatRoundStep(-3), COPPER_PER_SILVER);
+    assert.equal(normalizeChatRoundStep("10"), 10);
+    assert.equal(normalizeChatRoundStep(5.9), 5);
+  });
+
+  it("rounds chat amounts to the chosen copper step", () => {
     assert.equal(roundCopperForChat(0), 0);
     assert.equal(roundCopperForChat(49), 0);
     assert.equal(roundCopperForChat(50), 100);
     assert.equal(roundCopperForChat(889), 900);
     assert.equal(roundCopperForChat(840), 800);
+
+    assert.equal(roundCopperForChat(7, 5), 5);
+    assert.equal(roundCopperForChat(8, 5), 10);
+    assert.equal(roundCopperForChat(14, 10), 10);
+    assert.equal(roundCopperForChat(16, 10), 20);
+    assert.equal(roundCopperForChat(12_345, COPPER_PER_GOLD), 10_000);
   });
 
-  it("formats coins with short suffixes after silver rounding", () => {
+  it("formats coins after rounding; keeps copper when step is under 1s", () => {
     assert.equal(formatCoinsChat(0), "0s");
     assert.equal(formatCoinsChat(73), "1s");
+    assert.equal(formatCoinsChat(7, 1), "7c");
+    assert.equal(formatCoinsChat(12, 5), "10c");
     assert.equal(formatCoinsChat(100 + 73), "2s");
     assert.equal(formatCoinsChat(100 * 100 + 5), "1g");
   });
@@ -30,6 +49,10 @@ describe("settlement-chat", () => {
     assert.equal(
       formatTransferChat({ from: "Polipopolin", to: "Sickrose", copper: 889 }),
       "Polipopolin>Sickrose 9s",
+    );
+    assert.equal(
+      formatTransferChat({ from: "A", to: "B", copper: 47 }, 10),
+      "A>B 50c",
     );
   });
 
@@ -52,7 +75,20 @@ describe("settlement-chat", () => {
     assert.ok(!messages[0].includes("\n"));
   });
 
-  it("announces an equitable split when every tip rounds under a silver", () => {
+  it("keeps small tips when rounding to copper", () => {
+    const messages = buildSettlementChatMessages(
+      [
+        { from: "Alice", to: "Bob", copper: 40 },
+        { from: "Carol", to: "Dave", copper: 10 },
+      ],
+      { roundCopper: 1 },
+    );
+    assert.equal(messages.length, 1);
+    assert.ok(messages[0].includes("Alice>Bob 40c"));
+    assert.ok(messages[0].includes("Carol>Dave 10c"));
+  });
+
+  it("announces an equitable split when every tip rounds under the step", () => {
     const messages = buildSettlementChatMessages([
       { from: "Alice", to: "Bob", copper: 40 },
       { from: "Carol", to: "Dave", copper: 10 },
@@ -78,5 +114,26 @@ describe("settlement-chat", () => {
         ),
       );
     }
+  });
+
+  it("supports 5s and 1g steps", () => {
+    assert.equal(roundCopperForChat(240, 5 * COPPER_PER_SILVER), 0);
+    assert.equal(roundCopperForChat(260, 5 * COPPER_PER_SILVER), 500);
+    assert.equal(formatCoinsChat(14_000, COPPER_PER_GOLD), "1g");
+  });
+
+  it("formats and parses free-form round steps", () => {
+    assert.equal(formatChatRoundLabel(5), "5c");
+    assert.equal(formatChatRoundLabel(COPPER_PER_SILVER), "1s");
+    assert.equal(formatChatRoundLabel(5 * COPPER_PER_SILVER), "5s");
+    assert.equal(formatChatRoundLabel(COPPER_PER_GOLD), "1g");
+    assert.equal(parseChatRoundInput("5c"), 5);
+    assert.equal(parseChatRoundInput("10c"), 10);
+    assert.equal(parseChatRoundInput("5s"), 500);
+    assert.equal(parseChatRoundInput("1g"), COPPER_PER_GOLD);
+    assert.equal(parseChatRoundInput("1g 5s"), COPPER_PER_GOLD + 500);
+    assert.equal(parseChatRoundInput("25"), 25);
+    assert.equal(parseChatRoundInput(""), null);
+    assert.equal(parseChatRoundInput("nope"), null);
   });
 });

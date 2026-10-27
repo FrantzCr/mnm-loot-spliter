@@ -9,7 +9,8 @@ import {
   joinParty,
   leaveParty,
   readParty,
-  resetParty,
+  closeParty,
+  resetPot,
   settlePartyEveryone,
   settlePartyPresence,
   startParty,
@@ -450,7 +451,7 @@ describe("splitPot", () => {
 });
 
 describe("party", () => {
-  it("keeps new loot in the open group and drops it from the pot on reset", () => {
+  it("keeps new loot in the open group and drops it from the pot on reset pot", () => {
     const file = path.join(os.tmpdir(), `registre-groupe-${Date.now()}-${Math.random()}.sqlite`);
     const db = openDatabase(file);
     try {
@@ -459,7 +460,7 @@ describe("party", () => {
       assert.equal(opened.party?.presences.length, 1);
       assert.equal(opened.party?.presences[0]?.name, "Place");
       assert.equal(opened.party?.presences[0]?.joinedAt, opened.party?.startedAt);
-      resetParty(db);
+      closeParty(db);
       startParty(db);
       db.prepare("UPDATE parties SET started_at = ? WHERE status = 'open'").run("2026-10-22T10:00:00.000Z");
       const events = parseLedgerDocument(
@@ -504,9 +505,10 @@ describe("party", () => {
       assert.equal(share(lira.id), 125);
       assert.equal(share(alderenPresence), 250);
       assert.equal(continued.split?.balances.find((row) => row.key === mira.id)?.balanceCopper, 0);
-      resetParty(db);
+      resetPot(db);
       const after = readParty(db);
-      assert.equal(after.party, null);
+      assert.ok(after.party);
+      assert.equal(after.party.presences.length, 3);
       assert.equal(after.lines.length, 0);
       const kept = db.prepare("SELECT COUNT(*) AS n FROM loot_entries").get() as { n: number };
       assert.equal(Number(kept.n), 2);
