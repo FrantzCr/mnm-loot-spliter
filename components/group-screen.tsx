@@ -200,6 +200,7 @@ export function GroupScreen() {
   const [priceParts, setPriceParts] = useState<CoinParts>(EMPTY_COINS);
   const [lootPersonId, setLootPersonId] = useState<string | null>(null);
   const [membersOpen, setMembersOpen] = useState(true);
+  const [screenTab, setScreenTab] = useState<GroupScreenTab>("overview");
   const [potOpen, setPotOpen] = useState(true);
   const [pendingOpen, setPendingOpen] = useState(true);
 
@@ -654,17 +655,21 @@ export function GroupScreen() {
   const lines = view?.lines ?? [];
   // Item loot only — corpse coins stay out of primary worth / /split (see docs/release-next.md).
   const { lootCopper: knownValue } = potSessionTotals(lines);
-  const missing = lines.filter(
+  const unpricedLootCount = lines.filter(
     (line) => line.unitCopper == null && !isCorpseCoins(line.itemName),
   ).length;
-  const unpricedLootCount = missing;
-  // After Record everyone (no remaining tips), drop unpriced noise from Overview.
+  // Unpriced items live under Loot; Overview only nudges while tips are still open.
   const splitSettledQuiet =
     !!view?.split &&
     view.split.mode === "value" &&
     view.split.transfers.length === 0 &&
     view.split.settled.length > 0;
-  const showUnpricedOverview = unpricedLootCount > 0 && !splitSettledQuiet;
+  const showUnpricedHint = !!party && unpricedLootCount > 0 && !splitSettledQuiet;
+  const screenTabs: Array<{ id: GroupScreenTab; label: string; badge: number | null }> = [
+    { id: "overview", label: copy.group.screenTabOverview, badge: null },
+    { id: "loot", label: copy.group.screenTabLoot, badge: unpricedLootCount > 0 ? unpricedLootCount : null },
+    { id: "sell", label: copy.group.screenTabSell, badge: pending.length > 0 ? pending.length : null },
+  ];
 
   function dismissClose() {
     if (saving) return;
@@ -752,7 +757,72 @@ export function GroupScreen() {
 
       {loading ? <p className="text-sm text-muted-foreground">{copy.group.loading}</p> : null}
 
-      {view ? (
+      <div
+        role="tablist"
+        aria-label={copy.group.screenTabs}
+        className="flex w-full gap-1 border-b-2 border-[#6e5338]/50"
+        onKeyDown={(event) => {
+          const index = screenTabs.findIndex((tab) => tab.id === screenTab);
+          let next = index;
+          if (event.key === "ArrowRight") next = (index + 1) % screenTabs.length;
+          else if (event.key === "ArrowLeft") next = (index - 1 + screenTabs.length) % screenTabs.length;
+          else return;
+          event.preventDefault();
+          const id = screenTabs[next]?.id;
+          if (!id) return;
+          setScreenTab(id);
+          document.getElementById(`group-screen-tab-${id}`)?.focus();
+        }}
+      >
+        {screenTabs.map((tab) => {
+          const selected = tab.id === screenTab;
+          return (
+            <button
+              key={tab.id}
+              id={`group-screen-tab-${tab.id}`}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-controls={`group-screen-panel-${tab.id}`}
+              tabIndex={selected ? 0 : -1}
+              onClick={() => setScreenTab(tab.id)}
+              className={cn(
+                "-mb-0.5 inline-flex items-center gap-2 rounded-t-sm border-2 border-b-0 px-4 py-2 font-heading text-base transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#7a4503]/40",
+                selected
+                  ? "border-[#6e5338]/50 bg-card text-foreground"
+                  : "border-transparent text-muted-foreground hover:bg-[#efe6d6]/70 hover:text-foreground",
+              )}
+            >
+              {tab.label}
+              {tab.badge != null ? (
+                <span className="rounded-full bg-[#6e5338]/15 px-1.5 font-body text-xs tabular-nums text-foreground">
+                  {tab.badge}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        role="tabpanel"
+        id={`group-screen-panel-${screenTab}`}
+        aria-labelledby={`group-screen-tab-${screenTab}`}
+        className="grid gap-4"
+      >
+
+      {screenTab === "overview" && showUnpricedHint ? (
+        <Alert>
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+            <span>{copy.group.overviewUnpricedHint(unpricedLootCount)}</span>
+            <Button type="button" variant="outline" size="sm" onClick={() => setScreenTab("loot")}>
+              {copy.group.screenTabLoot}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {screenTab === "overview" && view ? (
         <Card>
           <CardHeader className={party ? "gap-2" : undefined}>
             {party ? (
@@ -788,13 +858,8 @@ export function GroupScreen() {
                       text={copy.group.knownValue(COIN_SLOT)}
                       amounts={[knownValue]}
                     />
-                    {"."}
-                    {missing > 0 ? (
-                      <>
-                        <br />
-                        {copy.group.missingValue(missing)}
-                      </>
-                    ) : null}{" "}
+                    {". "}
+                    {/* Unpriced count lives in the Overview hint + Loot tab badge (C2). */}
                     {copy.group.lateJoin}
                   </>
                 ) : (
@@ -1112,7 +1177,11 @@ export function GroupScreen() {
         </Card>
       ) : null}
 
-      {party ? (
+      {screenTab === "loot" && !party ? (
+        <p className="text-sm text-muted-foreground">{copy.group.lootNoGroup}</p>
+      ) : null}
+
+      {screenTab === "loot" && party ? (
         <Card>
           <CollapsibleCardHeader
             headingId="group-pot-heading"
@@ -1132,7 +1201,7 @@ export function GroupScreen() {
                     text={copy.group.potCollapsedSummary(lines.length, COIN_SLOT)}
                     amounts={[knownValue]}
                   />
-                  {showUnpricedOverview ? (
+                  {unpricedLootCount > 0 ? (
                     <>
                       {" · "}
                       {copy.group.potCollapsedUnpriced(unpricedLootCount)}
@@ -1149,7 +1218,6 @@ export function GroupScreen() {
             ) : (
               <>
                 {(() => {
-                  if (!showUnpricedOverview) return null;
                   const unpricedLoot = stackLootLinesAcrossPeople(
                     lines.filter((line) => line.unitCopper == null && !isCorpseCoins(line.itemName)),
                   );
@@ -1351,7 +1419,7 @@ export function GroupScreen() {
         </Card>
       ) : null}
 
-      {view?.split ? (
+      {screenTab === "overview" && view?.split ? (
         <SplitResult
           split={view.split}
           lines={lines}
@@ -1440,6 +1508,7 @@ export function GroupScreen() {
         </DialogContent>
       </Dialog>
 
+      {screenTab === "sell" ? (
       <Card>
         <CollapsibleCardHeader
           headingId="group-pending-heading"
@@ -1515,9 +1584,13 @@ export function GroupScreen() {
         </CardContent>
         ) : null}
       </Card>
+      ) : null}
+      </div>
     </div>
   );
 }
+
+type GroupScreenTab = "overview" | "loot" | "sell";
 
 function SplitResult({
   split,

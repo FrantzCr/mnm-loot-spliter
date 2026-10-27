@@ -35,8 +35,8 @@
 
 | ID | Item | Status |
 |----|------|--------|
-| C1 | Group tabs: **Overview** \| **Loot** \| **To sell** (Waiting to sell out of Overview) | pending |
-| C2 | Unpriced list lives under Loot (or Prices), not sticky on Overview after settle | pending |
+| C1 | Group tabs: **Overview** \| **Loot** \| **To sell** (Waiting to sell out of Overview) | done |
+| C2 | Unpriced list lives under Loot (or Prices), not sticky on Overview after settle | done |
 
 ### D — Multi-group + naming
 
@@ -88,4 +88,6 @@
 - **2026-10-27** — A5 done: `lib/chunk-recovery.ts` + `app/error.tsx` / new `app/global-error.tsx` hard-reload once per path on ChunkLoadError (sessionStorage guard), then fall back to error UI.
 - **2026-10-27** — B1/B2: Share block is now tabs (Group chat \| /split) with one preview + one Copy; `components/chat-round-toggle.tsx` (`ChatRoundPicker`) used on Share card and in Options. Rounding = any step (Frantz: "toute valeur").
 - **2026-10-27** — B3: schema 8 — `parties.session_epoch`, `parties.pot_started_at`, `loot_entries.group_epoch`, `party_settlements.session_epoch`. `resetPot` replaces `resetParty` (DELETE /api/group): bumps epoch, clears settled_at, keeps presences. Loot looted before `pot_started_at` but read late lands in the previous (hidden) epoch. Close→resale only enqueues current-epoch loot. Test: `lib/reset-pot.test.ts`.
-- **Next:** C1/C2 (tabs Overview | Loot | To sell), then D (multi-group), E (visual).
+- **2026-10-27** — A+B committed (`d66fcf4`).
+- **2026-10-27** — C1/C2: page-level tabs in `group-screen` (Overview = roster + split; Loot = pot with unpriced list always on top; To sell = pending resale). Tab badges: unpriced count on Loot, pending count on To sell. Overview shows a one-line unpriced hint (with a jump to Loot) only while tips are still open; the duplicate unpriced line in the members summary was removed.
+- **Next:** D (parties.name, active/closed archive, switcher), then E (visual).
