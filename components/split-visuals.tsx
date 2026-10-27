@@ -1,219 +1,188 @@
 "use client";
 
-import { BanknoteArrowDown, BanknoteArrowUp, Scale } from "lucide-react";
+import type { ReactNode } from "react";
 
-import { CoinAmount } from "@/components/coin-amount";
+import { CoinAmount, coinColumnsFor } from "@/components/coin-amount";
 import { useI18n } from "@/components/locale";
 import type { BalanceRow } from "@/lib/split";
 import { cn } from "cn";
 
-/** Palette shared by the rail, the cards and the hold-vs-share bar. */
-const TONE = {
-  owe: "text-destructive",
-  owed: "text-[#2f5d3a]",
-  even: "text-muted-foreground",
-} as const;
-
-function tone(balance: number): keyof typeof TONE {
-  if (balance > 0) return "owe";
-  if (balance < 0) return "owed";
-  return "even";
-}
-
-function pct(part: number, whole: number): number {
-  if (!(whole > 0)) return 0;
-  return Math.max(0, Math.min(100, (part / whole) * 100));
-}
+// `balanceCopper > 0`: holds more than the fair share → gives. `< 0`: holds less → receives.
+const GIVE = "text-[#9a2f1f]";
+/** Panel amounts keep the 3 largest denominations (exact up to gold; platinum rounds to silver). */
+const RAIL_DENOMINATIONS = 3;
+const RECEIVE = "text-[#2f5d3a]";
 
 /**
- * Signed balance chip: "− 2s 36c" (gives) in red, "+ 4s 29c" (receives) in green, "even" otherwise.
- * `balance > 0` means the member holds more than their share and owes the difference.
+ * Overview members panel: one tight row per member, a bar centred on the fair share that grows
+ * left (red, gives) or right (green, receives) in proportion to the amount. Sorted from the
+ * biggest giver to the biggest receiver so the shape reads at a glance. Nothing to click on a
+ * row: `rowNote` adds exceptions (late join, left, different share) next to the held value and
+ * `rowActions` are icon buttons right of the amount; `children` render under the list.
  */
-export function BalanceChip({ balance, size = "md" }: { balance: number; size?: "sm" | "md" | "lg" }) {
-  const { copy } = useI18n();
-  const kind = tone(balance);
-  const Icon = kind === "owe" ? BanknoteArrowUp : kind === "owed" ? BanknoteArrowDown : Scale;
-  const label =
-    kind === "owe" ? copy.group.balanceGives : kind === "owed" ? copy.group.balanceReceives : copy.group.balanceEven;
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border font-medium whitespace-nowrap",
-        size === "sm" && "px-1.5 py-0.5 text-xs",
-        size === "md" && "px-2 py-0.5 text-sm",
-        size === "lg" && "px-2.5 py-1 text-base",
-        kind === "owe" && "border-destructive/40 bg-destructive/8",
-        kind === "owed" && "border-[#2f5d3a]/40 bg-[#2f5d3a]/8",
-        kind === "even" && "border-border bg-muted/40",
-        TONE[kind],
-      )}
-    >
-      <Icon className={size === "sm" ? "size-3.5" : "size-4"} aria-hidden />
-      <span className="sr-only">{label}</span>
-      {kind === "even" ? (
-        <span>{label}</span>
-      ) : (
-        <>
-          <span aria-hidden>{kind === "owe" ? "−" : "+"}</span>
-          <CoinAmount copper={Math.abs(balance)} omitZeros />
-        </>
-      )}
-    </span>
-  );
-}
-
-/**
- * Horizontal hold-vs-share bar on a shared scale. The solid part is what both hold and share
- * agree on; red hatching is held above the share (to give), a dashed green slot is share not yet
- * held (to receive). A tick marks the fair share.
- */
-export function HoldShareBar({
-  held,
-  share,
-  scale,
-  thick = false,
+export function MemberRail({
+  members,
+  totalCopper,
+  subtitle,
+  rowNote,
+  rowActions,
+  selectedKey = null,
+  onSelect,
+  selectLabel,
+  children,
 }: {
-  held: number;
-  share: number;
-  /** Copper that maps to 100% of the track (shared across members so bars compare). */
-  scale: number;
-  thick?: boolean;
+  members: BalanceRow[];
+  totalCopper: number;
+  subtitle?: ReactNode;
+  rowNote?: (row: BalanceRow) => string | null;
+  rowActions?: (row: BalanceRow) => ReactNode;
+  /** Highlighted row (e.g. the member the Loot list is filtered on). */
+  selectedKey?: string | null;
+  /** Clicking a row's bar/amount; rows where it returns nothing useful should be excluded via `canSelect`. */
+  onSelect?: { canSelect: (row: BalanceRow) => boolean; select: (row: BalanceRow) => void };
+  /** Accessible label for a selectable row, e.g. "Show Yme's loot". */
+  selectLabel?: (row: BalanceRow) => string;
+  children?: ReactNode;
 }) {
-  const base = pct(Math.min(held, share), scale);
-  const heldPct = pct(held, scale);
-  const sharePct = pct(share, scale);
-  return (
-    <div
-      className={cn(
-        "relative w-full overflow-hidden rounded-sm bg-[#6e5338]/10",
-        thick ? "h-4" : "h-2.5",
-      )}
-      aria-hidden
-    >
-      <div className="absolute inset-y-0 left-0 bg-[#6e5338]/75" style={{ width: `${base}%` }} />
-      {held > share ? (
-        <div
-          className="absolute inset-y-0 bg-destructive/70 bg-[repeating-linear-gradient(135deg,transparent_0_3px,rgba(255,255,255,0.35)_3px_6px)]"
-          style={{ left: `${sharePct}%`, width: `${heldPct - sharePct}%` }}
-        />
-      ) : null}
-      {share > held ? (
-        <div
-          className="absolute inset-y-0 border border-dashed border-[#2f5d3a]/80 bg-[#2f5d3a]/12"
-          style={{ left: `${heldPct}%`, width: `${sharePct - heldPct}%` }}
-        />
-      ) : null}
-      {share > 0 ? (
-        <div
-          className="absolute -inset-y-px w-0.5 bg-foreground/80"
-          style={{ left: `calc(${sharePct}% - 1px)` }}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-/**
- * Left rail on Overview: every member with their share of the pot's item worth and how far that
- * sits from the fair share.
- */
-export function MemberRail({ members, totalCopper }: { members: BalanceRow[]; totalCopper: number }) {
   const { copy } = useI18n();
-  const ordered = [...members].sort((a, b) => {
-    if ((a.leftAt == null) !== (b.leftAt == null)) return a.leftAt == null ? -1 : 1;
-    return b.lootedCopper - a.lootedCopper;
-  });
+  const ordered = [...members].sort((a, b) => b.balanceCopper - a.balanceCopper);
+  const maxAbs = Math.max(1, ...ordered.map((row) => Math.abs(row.balanceCopper)));
+  // Same coin columns on every row so icons line up; at most 3 so platinum amounts still fit.
+  const coinColumns = coinColumnsFor(
+    ordered.map((row) => row.balanceCopper),
+    RAIL_DENOMINATIONS,
+  );
   return (
-    <aside className="grid content-start gap-3 rounded-sm border border-[#6e5338]/45 bg-card p-3 lg:sticky lg:top-4">
+    <aside className="grid content-start gap-2 rounded-sm border border-[#6e5338]/45 bg-card px-3 py-2.5 lg:sticky lg:top-4">
       <div className="grid gap-0.5">
-        <h3 className="font-heading text-base">{copy.group.railTitle}</h3>
-        <p className="text-xs text-muted-foreground">
-          {copy.group.railTotal} <CoinAmount copper={totalCopper} omitZeros />
-        </p>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-2">
+          <h3 className="font-heading text-base">{copy.group.railTitle}</h3>
+          <span className="text-xs text-muted-foreground">
+            {copy.group.railTotal} <CoinAmount copper={totalCopper} omitZeros significant={RAIL_DENOMINATIONS} />
+          </span>
+        </div>
+        {subtitle ? <p className="text-xs text-muted-foreground">{subtitle}</p> : null}
       </div>
       {ordered.length === 0 ? (
         <p className="text-sm text-muted-foreground">{copy.group.railEmpty}</p>
       ) : (
-        <ul className="grid gap-3">
+        <div className="grid grid-cols-[minmax(9.5rem,1fr)_auto_auto_auto] items-center gap-x-1 text-sm sm:gap-x-1.5">
           {ordered.map((row) => {
-            const heldShare = Math.round(pct(row.lootedCopper, totalCopper));
-            const fairShare = Math.round(pct(row.shareCopper, totalCopper));
+            const width = (Math.abs(row.balanceCopper) / maxAbs) * 50;
+            const gives = row.balanceCopper > 0;
+            const note = rowNote?.(row) ?? null;
+            const selectable = onSelect?.canSelect(row) ?? false;
+            const selected = selectedKey === row.key;
+            const Main = selectable ? "button" : "span";
             return (
-              <li key={row.key} className={cn("grid gap-1", row.leftAt ? "opacity-55" : undefined)}>
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="truncate font-heading text-sm">{row.name}</span>
-                  <span className="text-xs tabular-nums text-muted-foreground">
-                    {copy.group.railPercent(heldShare, fairShare)}
+              <div
+                key={row.key}
+                className={cn(
+                  "col-span-4 -mx-1.5 grid grid-cols-subgrid items-center rounded-sm px-1.5",
+                  selectable && "transition-colors hover:bg-[#efe6d6]/70",
+                  selected && "bg-[#efe6d6] shadow-[inset_3px_0_0_#6e5338] hover:bg-[#efe6d6]",
+                )}
+              >
+                <Main
+                  {...(selectable
+                    ? {
+                        type: "button" as const,
+                        "aria-pressed": selected,
+                        title: selectLabel?.(row),
+                        onClick: () => onSelect?.select(row),
+                      }
+                    : {})}
+                  className={cn(
+                    "col-span-3 grid grid-cols-subgrid items-center rounded-sm text-left",
+                    selectable &&
+                      "cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[#7a4503]/40",
+                    row.leftAt ? "[&>*]:opacity-55" : undefined,
+                  )}
+                >
+                {/* Name sits against the axis on the side the bar does not use, so it never overlaps. */}
+                <span className="relative h-10">
+                  <span className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-foreground/25" aria-hidden />
+                  {row.balanceCopper !== 0 ? (
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "absolute inset-y-1.5 min-w-[3px]",
+                        gives ? "right-1/2 rounded-l-[3px] bg-[#9a2f1f]/45" : "left-1/2 rounded-r-[3px] bg-[#2f5d3a]/45",
+                      )}
+                      style={{ width: `${width}%` }}
+                    />
+                  ) : null}
+                  {/* Name with the item value they hold (and any exception) just under it. */}
+                  <span
+                    className={cn(
+                      "absolute top-1/2 grid max-w-[calc(50%-0.5rem)] -translate-y-1/2 gap-0.5",
+                      gives ? "left-[calc(50%+0.4rem)] justify-items-start" : "right-[calc(50%+0.4rem)] justify-items-end text-right",
+                    )}
+                  >
+                    <span className="max-w-full truncate font-heading text-[0.9375rem] leading-none text-foreground/90 [-webkit-text-stroke:0.15px_currentColor]">
+                      {row.name}
+                    </span>
+                    <span className="max-w-full truncate text-[0.625rem] leading-none text-muted-foreground sm:text-[0.6875rem]" title={note ?? undefined}>
+                      <span className="sr-only">{copy.group.inHand} </span>
+                      <CoinAmount copper={row.lootedCopper} omitZeros significant={RAIL_DENOMINATIONS} />
+                      {note ? <span className="italic"> · {note}</span> : null}
+                    </span>
                   </span>
-                </div>
-                <HoldShareBar held={row.lootedCopper} share={row.shareCopper} scale={totalCopper} />
-                <div className="flex justify-end">
-                  <BalanceChip balance={row.balanceCopper} size="sm" />
-                </div>
-              </li>
+                </span>
+                {row.balanceCopper === 0 ? (
+                  <span className="col-span-2 justify-self-end text-muted-foreground">{copy.group.balanceEven}</span>
+                ) : (
+                  <>
+                    <span aria-hidden className={cn("font-mono opacity-80", gives ? GIVE : RECEIVE)}>
+                      {gives ? "−" : "+"}
+                    </span>
+                    <span className={cn("justify-self-end opacity-80", gives ? GIVE : RECEIVE)}>
+                      <span className="sr-only">{gives ? copy.group.balanceGives : copy.group.balanceReceives}</span>
+                      <CoinAmount copper={Math.abs(row.balanceCopper)} columns={coinColumns} />
+                    </span>
+                  </>
+                )}
+                </Main>
+                <span className="flex items-center justify-end">{rowActions?.(row)}</span>
+              </div>
             );
           })}
-        </ul>
+        </div>
       )}
-      <RailLegend />
+      {children ? <div className="grid gap-3 border-t border-border pt-3">{children}</div> : null}
     </aside>
   );
 }
 
-function RailLegend() {
-  const { copy } = useI18n();
+/** Small square icon button for member row actions (settle, leave). Hidden slot keeps alignment. */
+export function RowIconButton({
+  label,
+  hidden = false,
+  disabled = false,
+  onClick,
+  children,
+}: {
+  label: string;
+  hidden?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
   return (
-    <div className="grid gap-1 border-t border-border pt-2 text-[0.6875rem] text-muted-foreground">
-      <span className="inline-flex items-center gap-1.5">
-        <span className="inline-block h-2 w-3 rounded-[1px] bg-[#6e5338]/75" /> {copy.group.legendHeld}
-      </span>
-      <span className="inline-flex items-center gap-1.5">
-        <span className="inline-block h-2.5 w-0.5 bg-foreground/80" /> {copy.group.legendShare}
-      </span>
-      <span className="inline-flex items-center gap-1.5">
-        <span className="inline-block h-2 w-3 rounded-[1px] bg-destructive/70" /> {copy.group.legendOver}
-      </span>
-      <span className="inline-flex items-center gap-1.5">
-        <span className="inline-block h-2 w-3 rounded-[1px] border border-dashed border-[#2f5d3a]/80 bg-[#2f5d3a]/12" />{" "}
-        {copy.group.legendUnder}
-      </span>
-    </div>
-  );
-}
-
-/** Large per-player recap: name, signed balance, hold-vs-share bar and the two amounts. */
-export function PlayerRecapCard({ row, scale }: { row: BalanceRow; scale: number }) {
-  const { copy } = useI18n();
-  const kind = tone(row.balanceCopper);
-  return (
-    <li
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      aria-hidden={hidden || undefined}
+      tabIndex={hidden ? -1 : undefined}
+      disabled={disabled || hidden}
+      onClick={onClick}
       className={cn(
-        "grid gap-3 rounded-sm border-2 bg-card p-4",
-        kind === "owe" && "border-destructive/35",
-        kind === "owed" && "border-[#2f5d3a]/35",
-        kind === "even" && "border-[#6e5338]/25",
-        row.leftAt ? "opacity-70" : undefined,
+        "inline-flex size-5 items-center justify-center rounded-sm sm:size-6 text-foreground/65 outline-none transition-colors hover:bg-[#6e5338]/12 hover:text-foreground focus-visible:ring-2 focus-visible:ring-[#7a4503]/40 disabled:pointer-events-none",
+        hidden && "invisible",
       )}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="font-heading text-xl">{row.name}</span>
-        <BalanceChip balance={row.balanceCopper} size="lg" />
-      </div>
-      <HoldShareBar held={row.lootedCopper} share={row.shareCopper} scale={scale} thick />
-      <dl className="grid grid-cols-2 gap-2 text-sm">
-        <div className="grid gap-0.5">
-          <dt className="text-xs text-muted-foreground">{copy.group.inHand}</dt>
-          <dd className="font-medium">
-            <CoinAmount copper={row.lootedCopper} omitZeros />
-          </dd>
-        </div>
-        <div className="grid gap-0.5 text-right">
-          <dt className="text-xs text-muted-foreground">{copy.group.share}</dt>
-          <dd className="font-medium">
-            <CoinAmount copper={row.shareCopper} omitZeros />
-          </dd>
-        </div>
-      </dl>
-    </li>
+      {children}
+    </button>
   );
 }

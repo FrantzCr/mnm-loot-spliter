@@ -3,13 +3,56 @@
 import { Fragment, type ReactNode } from "react";
 
 import { useI18n } from "@/components/locale";
-import { copperToCoins, formatCoins, type CoinParts } from "@/lib/money";
+import {
+  COPPER_PER_GOLD,
+  COPPER_PER_PLATINUM,
+  COPPER_PER_SILVER,
+  copperToCoins,
+  formatCoins,
+  type CoinParts,
+} from "@/lib/money";
 import { cn } from "cn";
 
 /** Passed into copy strings so a coin row can replace the amount words. */
 export const COIN_SLOT = "\u0001";
 
 const ORDER = ["platinum", "gold", "silver", "copper"] as const;
+
+export type CoinKey = (typeof ORDER)[number];
+
+/**
+ * Shared columns for a list of amounts: from the largest denomination any of them uses down to
+ * copper. Pass the result as `columns` to every row so icons line up whatever the value.
+ */
+export function coinColumnsFor(amounts: number[], max: number = ORDER.length): CoinKey[] {
+  let first = ORDER.length - 1;
+  for (const amount of amounts) {
+    const parts = copperToCoins(Math.abs(Number.isFinite(amount) ? amount : 0));
+    const index = ORDER.findIndex((key) => parts[key] !== 0);
+    if (index >= 0 && index < first) first = index;
+  }
+  return ORDER.slice(first, first + max);
+}
+
+const UNIT: Record<CoinKey, number> = {
+  platinum: COPPER_PER_PLATINUM,
+  gold: COPPER_PER_GOLD,
+  silver: COPPER_PER_SILVER,
+  copper: 1,
+};
+
+/** Round to the smallest of the given denominations (columns that drop copper round to silver, …). */
+function roundToColumns(amount: number, columns: CoinKey[]): number {
+  const smallest = columns[columns.length - 1];
+  if (!smallest) return amount;
+  const unit = UNIT[smallest];
+  return Math.sign(amount) * Math.round(Math.abs(amount) / unit) * unit;
+}
+
+/** Keep only the `count` most significant denominations of one amount (rounded). */
+function roundToSignificant(amount: number, count: number): number {
+  return roundToColumns(amount, coinColumnsFor([amount], count));
+}
 
 /** Space between each coin-and-number pair. Icon-to-digit spacing stays tighter. */
 const PAIR_GAP = "gap-[6px]";
@@ -75,6 +118,7 @@ function CoinRow({
   negative,
   omitZeros = false,
   aligned = false,
+  columns,
 }: {
   parts: CoinParts;
   muted?: boolean;
@@ -82,7 +126,25 @@ function CoinRow({
   omitZeros?: boolean;
   /** Four fixed columns — icons line up even when digit counts differ (6 vs 66). */
   aligned?: boolean;
+  /** Fixed subset of columns (see `coinColumnsFor`); a zero denomination keeps its slot, blank. */
+  columns?: CoinKey[];
 }) {
+  if (columns) {
+    return (
+      <span aria-hidden="true" className={cn("inline-flex items-center", PAIR_GAP, muted && "opacity-80")}>
+        {negative ? <span className="leading-none">−</span> : null}
+        {columns.map((key) => (
+          <span
+            key={key}
+            className={cn("inline-flex items-center justify-end gap-0.5 leading-none", parts[key] === 0 && "invisible")}
+          >
+            <CoinMark paint={COIN_PAINT[key]} muted={muted} />
+            <span className="min-w-[2ch] text-right tabular-nums">{parts[key]}</span>
+          </span>
+        ))}
+      </span>
+    );
+  }
   if (aligned) {
     return (
       <span
@@ -123,18 +185,30 @@ export function CoinAmount({
   className,
   omitZeros = false,
   aligned = false,
+  columns,
+  significant,
 }: {
   copper: number;
   className?: string;
+  /** Show at most this many denominations from the largest (rounded); for tight panels. */
+  significant?: number;
   /** Drop denominations whose count is 0. A zero amount still shows copper. Ignored when `aligned`. */
   omitZeros?: boolean;
   /** Fixed four-column strip for vertical icon alignment in lists. */
   aligned?: boolean;
+  /** Compact alignment: only these denominations, shared across sibling rows (`coinColumnsFor`). */
+  columns?: CoinKey[];
 }) {
   const { locale } = useI18n();
   // Missing/NaN amounts render as 0 copper, not an em dash (formatCoins uses "—" for non-finite).
-  const amount = Number.isFinite(copper) ? copper : 0;
-  const label = formatCoins(amount, locale);
+  const exact = Number.isFinite(copper) ? copper : 0;
+  // Tight layouts trade the smallest coins for width; the accessible label stays exact.
+  const amount = columns
+    ? roundToColumns(exact, columns)
+    : significant
+      ? roundToSignificant(exact, significant)
+      : exact;
+  const label = formatCoins(exact, locale);
 
   return (
     <span
@@ -145,12 +219,14 @@ export function CoinAmount({
       )}
       role="img"
       aria-label={label}
+      data-coins=""
     >
       <CoinRow
         parts={copperToCoins(amount)}
         negative={amount < 0}
         omitZeros={aligned ? false : omitZeros}
         aligned={aligned}
+        columns={columns}
       />
     </span>
   );
@@ -166,6 +242,7 @@ export function UnknownPrice({ className }: { className?: string }) {
         PAIR_GAP,
         className,
       )}
+      data-coins=""
     >
       <CoinRow parts={{ platinum: 0, gold: 0, silver: 0, copper: 0 }} muted />
       <span>{copy.common.unknownPrice}</span>

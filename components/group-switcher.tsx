@@ -28,7 +28,7 @@ export function GroupBar({
   onShow,
   onRename,
 }: {
-  parties: PartySummary[];
+  parties: PartySummary[] | undefined;
   /** Party currently displayed (active or archive), null when no active group and no archive open. */
   shownId: string | null;
   archived: boolean;
@@ -39,14 +39,19 @@ export function GroupBar({
   const { copy, stamp } = useI18n();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
-  const shown = parties.find((party) => party.id === shownId) ?? null;
-  const active = parties.find((party) => party.status === "open") ?? null;
-  const archives = parties.filter((party) => party.status === "closed");
+  // Older responses (or a server mid-upgrade) may omit the list: treat it as empty.
+  const list = parties ?? [];
+  const shown = list.find((party) => party.id === shownId) ?? null;
+  const active = list.find((party) => party.status === "open") ?? null;
+  const archives = list.filter((party) => party.status === "closed");
   const label = (party: PartySummary) => partyLabel(party, copy.group.defaultName, stamp);
 
   async function submit() {
     if (!shown) return;
-    if (await onRename(shown.id, draft)) setEditing(false);
+    // Saving the untouched date label keeps the group unnamed (label follows the date).
+    const fallback = copy.group.defaultName(stamp(shown.startedAt));
+    const name = draft.trim() === fallback ? "" : draft;
+    if (await onRename(shown.id, name)) setEditing(false);
   }
 
   return (
@@ -68,6 +73,7 @@ export function GroupBar({
           >
             <input
               autoFocus
+              onFocus={(event) => event.currentTarget.select()}
               value={draft}
               maxLength={60}
               onChange={(event) => setDraft(event.target.value)}
@@ -94,7 +100,7 @@ export function GroupBar({
               aria-label={copy.group.renameLabel}
               title={copy.group.renameLabel}
               onClick={() => {
-                setDraft(shown.name ?? "");
+                setDraft(label(shown));
                 setEditing(true);
               }}
             >

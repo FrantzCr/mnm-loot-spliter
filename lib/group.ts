@@ -3,6 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { ErrorCode } from "./codes";
 import { asNumber, getDb, invalidateSocialFiles } from "./db";
 import { cleanText, titleCaseName } from "./format";
+import { gamePartyProposals, readGameParty, type GamePartyProposals } from "./game-party";
 import { enqueueGroupResale } from "./pending-resale";
 import { syncCharactersFromWatch } from "./scan";
 import {
@@ -53,6 +54,8 @@ export type PartyView = {
   split: SplitComputation | null;
   /** Every group, active first then newest archives. */
   parties: PartySummary[];
+  /** Open group only: in-game party arrivals / departures to offer (semi-automatic). */
+  gameParty: GamePartyProposals | null;
 };
 
 const MAX_PARTY_NAME = 60;
@@ -226,6 +229,20 @@ function addPresence(db: DatabaseSync, partyId: string, input: PartyMemberInput,
   ).run(crypto.randomUUID(), partyId, personId, label, at);
 }
 
+/** Party events from a day before the group opened are enough to know who was already in. */
+function gamePartyWindowStart(startedAt: string): string {
+  const start = Date.parse(startedAt);
+  return new Date((Number.isNaN(start) ? Date.now() : start) - 24 * 60 * 60 * 1000).toISOString();
+}
+
+/** Accept a client-given time (in-game join / leave) only when it is a real past instant. */
+export function eventTime(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const ms = Date.parse(value);
+  if (Number.isNaN(ms) || ms > Date.now() + 60_000) return undefined;
+  return new Date(ms).toISOString();
+}
+
 export function leaveParty(presenceId: string, db: DatabaseSync = getDb(), at = new Date().toISOString()): PartyView {
   const open = openParty(db);
   if (!open) throw new Error(ErrorCode.groupStartBeforeLeave);
@@ -348,7 +365,7 @@ export function readParty(db: DatabaseSync = getDb(), partyId: string | null = n
     | undefined;
   if (!party) {
     if (partyId) throw new Error(ErrorCode.groupMissing);
-    return { party: null, people, lines: [], split: null, parties };
+    return { party: null, people, lines: [], split: null, parties, gameParty: null };
   }
 
   const presences = (
@@ -452,5 +469,12 @@ export function readParty(db: DatabaseSync = getDb(), partyId: string | null = n
     lines,
     split: splitPot(lines, windows, mode, settlements),
     parties,
+    gameParty:
+      party.status === "open"
+        ? gamePartyProposals(readGameParty(db, gamePartyWindowStart(party.started_at)), {
+            startedAt: party.started_at,
+            presences,
+          })
+        : null,
   };
 }

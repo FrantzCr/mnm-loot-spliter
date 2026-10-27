@@ -61,9 +61,37 @@ export type ParsedSale = {
   zone: string | null;
 };
 
+/**
+ * In-game party events from Social ledgers (observed by the ledger's own character):
+ * act_31 PartyCreate, act_32 PartyJoin (f07 joins, f02 = "name_<b64 leader>"), act_33 PartyDisband,
+ * act_34 PartyLeave (f07 leaves), act_01 member snapshot right after a join (f07 + d21 level).
+ * d63 carries the base64 kind name; d64 a party ref; d62 the party size after the event.
+ */
+export type PartyEventKind = "create" | "join" | "leave" | "disband" | "member";
+
+export type ParsedPartyEvent = {
+  dedupeKey: string;
+  observer: string;
+  serverName: string | null;
+  kind: PartyEventKind;
+  name: string;
+  at: string;
+  partyRef: string | null;
+  level: number | null;
+};
+
+const PARTY_ACTIONS: Record<string, PartyEventKind> = {
+  act_31: "create",
+  act_32: "join",
+  act_33: "disband",
+  act_34: "leave",
+  act_01: "member",
+};
+
 export type ParseReport = {
   loot: ParsedLoot[];
   sales: ParsedSale[];
+  partyEvents: ParsedPartyEvent[];
   eventCount: number;
   lootEventCount: number;
   skippedWithoutItem: number;
@@ -121,6 +149,7 @@ export function parseLedgerDocument(json: unknown, origin: PathContext): ParseRe
   const empty: ParseReport = {
     loot: [],
     sales: [],
+    partyEvents: [],
     eventCount: 0,
     lootEventCount: 0,
     skippedWithoutItem: 0,
@@ -146,6 +175,8 @@ export function parseLedgerDocument(json: unknown, origin: PathContext): ParseRe
   const ordinals = new Map<string, number>();
   const loot: ParsedLoot[] = [];
   const sales: ParsedSale[] = [];
+  const partyEvents: ParsedPartyEvent[] = [];
+  const observer = ledgerName ?? plainName(origin.characterFromFile) ?? plainName(origin.characterFromPath);
   let lootEventCount = 0;
   let skippedWithoutItem = 0;
   let skippedWithoutCharacter = 0;
@@ -155,6 +186,18 @@ export function parseLedgerDocument(json: unknown, origin: PathContext): ParseRe
     const record = event as Record<string, unknown>;
     const action = typeof record.f01 === "string" ? record.f01.trim() : "";
     if (action) seenCodes.add(action);
+    const partyKind = PARTY_ACTIONS[action];
+    if (partyKind && observer) {
+      const server = plainName(origin.serverFromPath);
+      const event = partyEvent(partyKind, action, record, observer, server);
+      if (event) partyEvents.push(event);
+      // Joining someone's party: f02 names the leader, who is a member even without a roster line.
+      const leader = typeof record.f02 === "string" && record.f02.startsWith("name_") ? decodeBase64Text(record.f02.slice(5)) : null;
+      if (event && partyKind === "join" && leader && leader.toLowerCase() !== event.name.toLowerCase()) {
+        partyEvents.push({ ...event, kind: "member", name: leader, level: null, dedupeKey: `${event.dedupeKey}:leader:${leader}` });
+      }
+      continue;
+    }
     const sale = action === "act_24";
     const corpseCoins = action === "act_14";
     if (action !== "act_13" && !sale && !corpseCoins) continue;
@@ -247,6 +290,7 @@ export function parseLedgerDocument(json: unknown, origin: PathContext): ParseRe
   return {
     loot,
     sales,
+    partyEvents,
     eventCount: root.c01.length,
     lootEventCount,
     skippedWithoutItem,
@@ -339,6 +383,33 @@ function saleCopper(value: unknown): number | null {
     copper: Number(match[4]),
   });
   return isValidCopper(copper) ? copper : null;
+}
+
+function partyEvent(
+  kind: PartyEventKind,
+  action: string,
+  record: Record<string, unknown>,
+  observer: string,
+  serverName: string | null,
+): ParsedPartyEvent | null {
+  const name = plainName(record.f07);
+  const at = typeof record.f04 === "string" ? record.f04.trim() : "";
+  if (!name || !at) return null;
+  const detail = detailObjects(record.f03)[0] ?? {};
+  // act_01 is only a roster line when it carries a level (d21); other act_01 shapes are ignored.
+  const level = typeof detail.d21 === "number" && Number.isFinite(detail.d21) ? detail.d21 : null;
+  if (kind === "member" && level == null) return null;
+  const partyRef = typeof detail.d64 === "string" && detail.d64.trim() ? detail.d64.trim() : null;
+  return {
+    dedupeKey: `party:${serverName ?? ""}:${observer}:${action}:${at}:${name}`,
+    observer,
+    serverName,
+    kind,
+    name,
+    at,
+    partyRef,
+    level,
+  };
 }
 
 function detailObjects(value: unknown): Record<string, unknown>[] {

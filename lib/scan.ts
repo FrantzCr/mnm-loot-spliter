@@ -7,6 +7,7 @@ import {
   getDb,
   getSetting,
   ingestLoot,
+  ingestPartyEvents,
   ingestSales,
   invalidateSocialFiles,
   rememberCharacter,
@@ -269,6 +270,7 @@ function scanUnlocked(watchPath: string | null): ScanSnapshot {
     try {
       ingest = ingestLoot(db, loot);
       if (!social && parsed.sales.length > 0) sold = ingestSales(db, parsed.sales);
+      if (social) ingestPartyEvents(db, parsed.partyEvents);
     } catch {
       const message = `${relative} : could not save.`;
       snapshot.problems.push(message);

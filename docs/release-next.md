@@ -1,7 +1,7 @@
 # Next release plan (post-0.1.4)
 
-**Status:** in progress  
-**Target:** **one fat release** (`0.2.0` if schema/UI warrants, else `0.1.5`) — pack A–E together; full QA at the end.  
+**Status:** ready for desktop QA, then release  
+**Target:** **`0.2.0`** (schema 7 → 12, new Group layout, in-game party follow-up). Release with `npm run release -- 0.2.0 --notes "…"` once QA passes (the script builds, commits, tags, pushes and publishes).  
 **Owner notes (Frantz, 2026-10-27):** agent decides UI; pack max in one ship; resume from this file if context drops.
 
 ## Locked decisions
@@ -96,3 +96,28 @@
 - **2026-10-27** — D committed (`2b49ff9`).
 - **2026-10-27** — E1–E4: `components/split-visuals.tsx` — `MemberRail` (Overview left rail ≥lg, sticky; stacks on top below lg): per member % of item worth vs fair %, `HoldShareBar` and signed `BalanceChip`. `HoldShareBar`: solid = held up to share, red hatched = held above share (to give), dashed green = missing to share (to receive), tick = fair share. "What each person holds" now uses `PlayerRecapCard` (border tinted by balance, shared bar scale across players). Archived groups get the cards too (via `SplitResult`). Old `HoldCoinRow`/`HoldBalanceRow` removed. Checked at 1280, 800 and 375 px (no horizontal scroll).
 - **Next:** full QA pass on the packaged desktop build (`npm run desktop:prepare` + `tauri build`), then version bump (0.2.0: schema 7→9, new IA) and release.
+- **2026-10-27** — Post-E polish (uncommitted at time of writing): Members panel now holds all member management (expandable rows with Settle/Leave, add member, recent players, Close/Reset); "What each person holds" removed; held item value shown under each name; shared coin columns (`coinColumnsFor`). **Keep** the Sharing-the-loot totals strip (Item loot (priced) / Coins already split in-game / Session totals) — Frantz wants it; coins stay display-only, never in split math.
+- **2026-10-27** — In-game party follow-up (semi-automatic): Social ledgers carry party events (act_31 PartyCreate, act_32 PartyJoin with f02 = base64 leader, act_33 PartyDisband, act_34 PartyLeave, act_01 roster line with d21 level). Parsed in `ledger-parse` → `game_party_events` (schema 12; social files re-read once via setting `party_events_backfill_v2`). `lib/game-party.ts` replays per observer → live roster + departures; `gamePartyProposals` → `PartyView.gameParty` {arrivals, departures}. UI `GamePartyPrompt` in Members panel: add arrivals (one / all) at in-game join time, settle & leave / leave at in-game leave time, "party ended → close group"; dismissals per viewer in localStorage. Presence POST and leave POST accept `at` (`eventTime` guard). Autocomplete: live game party → players seen this week → past groups. Tests: `lib/game-party.test.ts`. Only the "party ended" prompt was seen on real data; arrivals / single departures are covered by unit tests only.
+- **2026-10-27** — Release prep: removed temp page `app/dev-rail-check`, dead `BalanceAmount`, 56 unused copy keys (×3 locales); `tsconfig` excludes `src-tauri` (stale build copies broke `tsc`); `shell.tsx` lint error fixed (first watch-path read deferred a tick); `GroupBar` tolerates a missing parties list; not-found link button sets `nativeButton={false}`. Lint, typecheck and 88 tests clean.
+
+## Draft release notes (0.2.0)
+
+**Group page, redesigned**
+- Members panel on the left (always visible): who gives / who receives as a bar centred on the fair share, items held under each name, = to settle and × to leave. Click a member to see their loot.
+- Two tabs on the right: **Split** (who pays whom, group chat announce, /split) and **Loot** (unpriced items first, sort by newest or value, waiting-to-sell list).
+- Named groups: rename with the pencil; closed groups stay readable as archives (Show menu).
+- Reset pot: start a fresh split with the same members.
+
+**In-game party follow-up (semi-automatic)**
+- Reads party joins / leaves from the game's Social ledger: offers to add new party members at their real join time, and to settle / leave members at their real leave time. Nothing changes without a click.
+- Add-member autocomplete suggests the live in-game party first, then players met this week.
+
+**Sharing**
+- Group chat rounding set right in the announce ("rounded to 10c ▾"); new steps 50c, 2s, 10s, 50s, any custom step; the announce says how it was rounded.
+- /split and fair shares use item value only (corpse coins stay out, shown as session info).
+
+**Fixes**
+- Packaged app: second launch focuses the open window; a failed page chunk reloads once instead of a blank page.
+- Coins centred inside buttons; totals labels stay on one line in every language.
+
+**Upgrade note:** the local database migrates automatically (schema 12) and re-reads Social ledgers once to import party history.

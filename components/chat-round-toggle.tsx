@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import {
   CHAT_ROUND_PRESETS,
+  chatRoundToken,
   formatChatRoundLabel,
   parseChatRoundInput,
 } from "@/lib/settlement-chat";
@@ -45,8 +47,10 @@ export function ChatRoundPicker({
 
   const chip = (active: boolean) =>
     cn(
-      "px-2 py-1 font-mono transition-colors border-r border-[#6e5338]/40 last:border-r-0",
-      active ? "bg-[#6e5338] text-[#f7f3ea]" : "text-muted-foreground hover:bg-[#efe6d6]",
+      "min-w-9 rounded-sm border px-2 py-1 text-center font-mono transition-colors",
+      active
+        ? "border-[#6e5338] bg-[#6e5338] text-[#f7f3ea]"
+        : "border-[#6e5338]/35 bg-card text-muted-foreground hover:bg-[#efe6d6] hover:text-foreground",
     );
 
   return (
@@ -54,7 +58,7 @@ export function ChatRoundPicker({
       <div
         role="radiogroup"
         aria-label={label}
-        className="inline-flex overflow-hidden rounded-sm border border-[#6e5338]/55 bg-card"
+        className="flex flex-wrap gap-1"
       >
         {CHAT_ROUND_PRESETS.map((preset) => (
           <button
@@ -108,5 +112,104 @@ export function ChatRoundPicker({
         </form>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * The announce preview with its rounding phrase ("rounded to 10c" / "exact") turned into a small
+ * clickable chip that opens the rounding picker in place. The copied text stays plain.
+ */
+export function ChatAnnounceWithRound({
+  message,
+  value,
+  onChange,
+  label,
+  customLabel,
+  customPlaceholder,
+  customApply,
+}: {
+  message: string;
+  value: number;
+  onChange: (copper: number) => void;
+  label: string;
+  customLabel: string;
+  customPlaceholder: string;
+  customApply: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLSpanElement>(null);
+  const token = chatRoundToken(value);
+  const at = message.indexOf(token);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (event: MouseEvent) => {
+      if (wrap.current && !wrap.current.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const chip = (
+    <span ref={wrap} className="relative inline-block">
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label={label}
+        title={label}
+        onClick={() => setOpen((current) => !current)}
+        className={cn(
+          "inline-flex items-center gap-0.5 rounded-sm border border-dashed border-[#6e5338]/60 bg-[#efe6d6]/70 px-1 leading-snug text-foreground transition-colors hover:border-solid hover:bg-[#efe6d6]",
+          open && "border-solid bg-[#efe6d6]",
+        )}
+      >
+        {token}
+        <ChevronDown className="size-3 opacity-70" aria-hidden />
+      </button>
+      {open ? (
+        <span
+          role="dialog"
+          aria-label={label}
+          className="absolute top-full left-0 z-30 mt-1 grid w-[17rem] gap-2 rounded-sm border border-[#6e5338]/55 bg-card p-2.5 font-body shadow-md"
+        >
+          <span className="text-xs text-muted-foreground">{label}</span>
+          <ChatRoundPicker
+            value={value}
+            onChange={(copper) => {
+              onChange(copper);
+              setOpen(false);
+            }}
+            label={label}
+            customLabel={customLabel}
+            customPlaceholder={customPlaceholder}
+            customApply={customApply}
+          />
+        </span>
+      ) : null}
+    </span>
+  );
+
+  // The "everyone is even" announce carries no rounding phrase: show the chip after it.
+  if (at < 0) {
+    return (
+      <>
+        {message} <span className="text-muted-foreground">·</span> {chip}
+      </>
+    );
+  }
+  return (
+    <>
+      {message.slice(0, at)}
+      {chip}
+      {message.slice(at + token.length)}
+    </>
   );
 }

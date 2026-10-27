@@ -1,7 +1,7 @@
 import { itemKey } from "./format";
 import { isPoolOnlyLine, type PotLine } from "./split";
 
-function stackBy<T extends { quantity: number }>(
+function stackBy<T extends { quantity: number; lootedAt: string }>(
   lines: T[],
   keyOf: (line: T) => string,
   merge: (into: T, line: T) => void,
@@ -18,6 +18,8 @@ function stackBy<T extends { quantity: number }>(
       continue;
     }
     merge(existing, line);
+    // A stacked row is as recent as its latest pickup (display sort "newest first").
+    if (line.lootedAt > existing.lootedAt) existing.lootedAt = line.lootedAt;
   }
   return order.map((key) => grouped.get(key) as T);
 }
@@ -129,4 +131,32 @@ export function stackLootLinesAcrossPeople(lines: PotLine[]): StackedAcrossPeopl
       holders: [holderShareFromLine(line)],
     }),
   );
+}
+
+export type LootSortMode = "recent" | "value";
+
+/**
+ * Display order for loot lists. Corpse coins always lead (they are not items). Then either newest
+ * pickup first, or cheapest line value first with unpriced lines last. Ties keep input order.
+ */
+export function sortLootForDisplay<T extends PotLine>(lines: T[], mode: LootSortMode): T[] {
+  const rank = (line: T) => (isPoolOnlyLine(line) ? 0 : 1);
+  return lines
+    .map((line, index) => ({ line, index }))
+    .sort((a, b) => {
+      const byPool = rank(a.line) - rank(b.line);
+      if (byPool !== 0) return byPool;
+      if (mode === "recent") {
+        if (a.line.lootedAt !== b.line.lootedAt) return a.line.lootedAt < b.line.lootedAt ? 1 : -1;
+        return a.index - b.index;
+      }
+      const av = a.line.unitCopper == null ? null : lineCopper(a.line);
+      const bv = b.line.unitCopper == null ? null : lineCopper(b.line);
+      if (av == null || bv == null) {
+        if (av == null && bv == null) return a.index - b.index;
+        return av == null ? 1 : -1;
+      }
+      return av - bv || a.index - b.index;
+    })
+    .map(({ line }) => line);
 }

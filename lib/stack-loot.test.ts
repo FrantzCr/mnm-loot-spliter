@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { COIN_LOOT_ITEM_NAME } from "./ledger-parse";
-import { stackLootLines, stackLootLinesAcrossPeople } from "./stack-loot";
+import { sortLootForDisplay, stackLootLines, stackLootLinesAcrossPeople } from "./stack-loot";
 import type { PotLine } from "./split";
 
 function line(partial: Partial<PotLine> & Pick<PotLine, "id" | "itemName" | "personId">): PotLine {
@@ -89,3 +89,27 @@ describe("stackLootLinesAcrossPeople", () => {
   });
 });
 
+describe("sortLootForDisplay", () => {
+  const rows = [
+    line({ id: "old", itemName: "Wool Scraps", personId: "p1", unitCopper: 3, lootedAt: "2026-10-22T10:00:00Z" }),
+    line({ id: "coins", itemName: COIN_LOOT_ITEM_NAME, personId: "p1", unitCopper: 400, lootedAt: "2026-10-22T09:00:00Z" }),
+    line({ id: "new", itemName: "Cheese", personId: "p1", unitCopper: 4, quantity: 3, lootedAt: "2026-10-22T12:00:00Z" }),
+    line({ id: "unpriced", itemName: "Rusty Spear", personId: "p1", lootedAt: "2026-10-22T11:00:00Z" }),
+  ];
+
+  it("keeps coins first, then newest pickup first", () => {
+    assert.deepEqual(sortLootForDisplay(rows, "recent").map((row) => row.id), ["coins", "new", "unpriced", "old"]);
+  });
+
+  it("keeps coins first, then cheapest line value, unpriced last", () => {
+    assert.deepEqual(sortLootForDisplay(rows, "value").map((row) => row.id), ["coins", "old", "new", "unpriced"]);
+  });
+
+  it("dates a stacked row by its latest pickup", () => {
+    const stacked = stackLootLinesAcrossPeople([
+      line({ id: "a", itemName: "Cheese", personId: "p1", unitCopper: 4, lootedAt: "2026-10-22T10:00:00Z" }),
+      line({ id: "b", itemName: "Cheese", personId: "p2", unitCopper: 4, lootedAt: "2026-10-22T13:00:00Z" }),
+    ]);
+    assert.equal(stacked[0]?.lootedAt, "2026-10-22T13:00:00Z");
+  });
+});

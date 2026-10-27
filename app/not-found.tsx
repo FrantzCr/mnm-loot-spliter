@@ -27,7 +27,7 @@ export default function NotFound() {
       <h2 className="font-heading text-2xl leading-snug">{copy.status.missingTitle}</h2>
       <p className="mt-1 text-sm text-muted-foreground">{copy.status.missingBody}</p>
       <div>
-        <Button render={<Link href="/" />}>{copy.status.home}</Button>
+        <Button nativeButton={false} render={<Link href="/" />}>{copy.status.home}</Button>
       </div>
     </div>
   );

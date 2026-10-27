@@ -61,13 +61,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
   }, [titled]);
 
   useEffect(() => {
-    void refreshWatchPath();
+    // First read on the next tick (state is set after the fetch, never synchronously in the effect).
+    const first = window.setTimeout(() => void refreshWatchPath(), 0);
     const onWatchPath = () => {
       void refreshWatchPath();
     };
     window.addEventListener("mnm:watch-path", onWatchPath);
     window.addEventListener("focus", onWatchPath);
     return () => {
+      window.clearTimeout(first);
       window.removeEventListener("mnm:watch-path", onWatchPath);
       window.removeEventListener("focus", onWatchPath);
     };

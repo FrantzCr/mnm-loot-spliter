@@ -1,6 +1,6 @@
 "use client";
 
-import { BanknoteArrowDown, BanknoteArrowUp, ChevronDown, User, X } from "lucide-react";
+import { BanknoteArrowDown, BanknoteArrowUp, ChevronDown, Equal, TriangleAlert, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   useCallback,
@@ -9,7 +9,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type KeyboardEvent,
   type ReactNode,
 } from "react";
 
@@ -52,14 +51,17 @@ import {
   readStoredChatRoundStep,
   writeStoredChatRoundStep,
 } from "@/lib/settlement-chat";
-import { ChatRoundPicker } from "@/components/chat-round-toggle";
+import { ChatAnnounceWithRound } from "@/components/chat-round-toggle";
 import { GroupBar } from "@/components/group-switcher";
-import { MemberRail, PlayerRecapCard } from "@/components/split-visuals";
+import { MemberRail, RowIconButton } from "@/components/split-visuals";
+import type { GamePartyProposals } from "@/lib/game-party";
 import type { PartySummary } from "@/lib/group";
 import { cn } from "cn";
 import {
   stackLootLines,
+  sortLootForDisplay,
   stackLootLinesAcrossPeople,
+  type LootSortMode,
   type LootHolderShare,
   type StackedAcrossPeopleLine,
 } from "@/lib/stack-loot";
@@ -87,6 +89,7 @@ type PartyView = {
   lines: PotLine[];
   split: SplitComputation | null;
   parties: PartySummary[];
+  gameParty: GamePartyProposals | null;
 };
 
 type DraftGuest = { key: string; name: string; personId?: string | null };
@@ -156,6 +159,18 @@ function lootPersonActiveInGroup(
   });
 }
 
+/** Loot owner for a member row: same person record, else same name (guests added by label). */
+function lootPersonForRow(
+  row: { personId: string | null; name: string },
+  lootPeople: Array<{ id: string; name: string }>,
+): { id: string; name: string } | null {
+  return (
+    lootPeople.find((person) => row.personId != null && person.id === row.personId) ??
+    lootPeople.find((person) => person.name.toLowerCase() === row.name.toLowerCase()) ??
+    null
+  );
+}
+
 /** True when this loot person matches only departed seats in the open group. */
 function lootPersonLeftGroup(
   person: { id: string; name: string },
@@ -170,16 +185,8 @@ function lootPersonLeftGroup(
   return related.every((presence) => presence.leftAt != null);
 }
 
-function lootTabId(personId: string): string {
-  return `loot-tab-${personId}`;
-}
-
-function lootPanelId(personId: string): string {
-  return `loot-panel-${personId}`;
-}
-
 export function GroupScreen() {
-  const { copy, coins, stamp, explain } = useI18n();
+  const { copy, coins, stamp, explain, locale } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [view, setView] = useState<PartyView | null>(null);
@@ -206,13 +213,13 @@ export function GroupScreen() {
   const [pricing, setPricing] = useState<PotLine | null>(null);
   const [priceParts, setPriceParts] = useState<CoinParts>(EMPTY_COINS);
   const [lootPersonId, setLootPersonId] = useState<string | null>(null);
-  const [membersOpen, setMembersOpen] = useState(true);
   const [screenTab, setScreenTab] = useState<GroupScreenTab>("overview");
+  const [lootSort, setLootSort] = useState<LootSortMode>("recent");
   /** Closed group opened read-only from the switcher (null = live view of the active group). */
   const [archiveId, setArchiveId] = useState<string | null>(null);
   const [archiveView, setArchiveView] = useState<PartyView | null>(null);
   const [potOpen, setPotOpen] = useState(true);
-  const [pendingOpen, setPendingOpen] = useState(true);
+  const [pendingOpen, setPendingOpen] = useState(false);
 
   const load = useCallback(async () => {
     const token = viewGate.snapshot();
@@ -421,13 +428,42 @@ export function GroupScreen() {
     }
   }
 
-  async function leave(id: string) {
+  async function addGameArrivals(arrivals: Array<{ name: string; since: string }>) {
+    if (arrivals.length === 0) return;
     setSaving(true);
     setError(null);
     viewGate.bump();
     const token = viewGate.snapshot();
     try {
-      const next = await api<PartyView>(`/api/group/presence/${id}/leave`, { method: "POST" });
+      let next: PartyView | null = null;
+      for (const arrival of arrivals) {
+        const person = view?.people.find((candidate) => candidate.name.toLowerCase() === arrival.name.toLowerCase());
+        next = await api<PartyView>("/api/group/presence", {
+          method: "POST",
+          body: JSON.stringify({ ...(person ? { personId: person.id } : { label: arrival.name }), at: arrival.since }),
+        });
+      }
+      if (!viewGate.isCurrent(token) || !next) return;
+      setView(next);
+    } catch (caught) {
+      if (!viewGate.isCurrent(token)) return;
+      setError(explain(caught, ErrorCode.memberAddFailed));
+      await load();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function leave(id: string, at?: string) {
+    setSaving(true);
+    setError(null);
+    viewGate.bump();
+    const token = viewGate.snapshot();
+    try {
+      const next = await api<PartyView>(`/api/group/presence/${id}/leave`, {
+        method: "POST",
+        body: JSON.stringify(at ? { at } : {}),
+      });
       if (!viewGate.isCurrent(token)) return false;
       setView(next);
       setLeaving(null);
@@ -461,18 +497,25 @@ export function GroupScreen() {
     }
   }
 
-  async function settleAndLeave(id: string) {
+  async function settleAndLeave(id: string, at?: string) {
     setSaving(true);
     setError(null);
     viewGate.bump();
     const token = viewGate.snapshot();
     let settledOk = false;
     try {
-      const settled = await api<PartyView>(`/api/group/presence/${id}/settle`, { method: "POST" });
-      if (!viewGate.isCurrent(token)) return;
-      setView(settled);
+      // Nothing to settle (balance 0): go straight to the leave.
+      const owes = view?.split?.balances.find((row) => row.key === id)?.balanceCopper ?? 0;
+      if (owes !== 0) {
+        const settled = await api<PartyView>(`/api/group/presence/${id}/settle`, { method: "POST" });
+        if (!viewGate.isCurrent(token)) return;
+        setView(settled);
+      }
       settledOk = true;
-      const left = await api<PartyView>(`/api/group/presence/${id}/leave`, { method: "POST" });
+      const left = await api<PartyView>(`/api/group/presence/${id}/leave`, {
+        method: "POST",
+        body: JSON.stringify(at ? { at } : {}),
+      });
       if (!viewGate.isCurrent(token)) return;
       setView(left);
       setLeaving(null);
@@ -665,8 +708,9 @@ export function GroupScreen() {
   const lines = view?.lines ?? [];
   // Item loot only — corpse coins stay out of primary worth / /split (see docs/release-next.md).
   const { lootCopper: knownValue } = potSessionTotals(lines);
-  const unpricedLootCount = lines.filter(
-    (line) => line.unitCopper == null && !isCorpseCoins(line.itemName),
+  // Same stacking as the "No price this session" list, so badge, hint and list agree.
+  const unpricedLootCount = stackLootLinesAcrossPeople(
+    lines.filter((line) => line.unitCopper == null && !isCorpseCoins(line.itemName)),
   ).length;
   // Unpriced items live under Loot; Overview only nudges while tips are still open.
   const splitSettledQuiet =
@@ -675,10 +719,18 @@ export function GroupScreen() {
     view.split.transfers.length === 0 &&
     view.split.settled.length > 0;
   const showUnpricedHint = !!party && unpricedLootCount > 0 && !splitSettledQuiet;
+  const railShares = view?.split
+    ? settlementMembers(view.split.balances)
+        .filter((row) => row.leftAt == null)
+        .map((row) => row.shareCopper)
+    : [];
+  const commonShare =
+    railShares.length > 0 && Math.max(...railShares) - Math.min(...railShares) <= 1
+      ? Math.round(railShares.reduce((sum, share) => sum + share, 0) / railShares.length)
+      : null;
   const screenTabs: Array<{ id: GroupScreenTab; label: string; badge: number | null }> = [
     { id: "overview", label: copy.group.screenTabOverview, badge: null },
     { id: "loot", label: copy.group.screenTabLoot, badge: unpricedLootCount > 0 ? unpricedLootCount : null },
-    { id: "sell", label: copy.group.screenTabSell, badge: pending.length > 0 ? pending.length : null },
   ];
 
   function dismissClose() {
@@ -743,42 +795,14 @@ export function GroupScreen() {
     lootPersonId != null && lootTabIds.includes(lootPersonId)
       ? lootPersonId
       : (lootTabIds[0] ?? null);
-  const stackedLoot = stackLootLines(lines);
+  const stackedLoot = sortLootForDisplay(stackLootLines(lines), lootSort);
   const activeLootPersonIds = new Set(
     lootPeople.filter((person) => lootPersonActiveInGroup(person, party)).map((person) => person.id),
   );
-  const allActiveLoot = stackLootLinesAcrossPeople(
-    lines.filter((line) => activeLootPersonIds.has(line.personId)),
+  const allActiveLoot = sortLootForDisplay(
+    stackLootLinesAcrossPeople(lines.filter((line) => activeLootPersonIds.has(line.personId))),
+    lootSort,
   );
-  /** One pass — priced item worth per person for compact tab labels (no corpse coins). */
-  const lootWorthByPerson = new Map<string, number>();
-  for (const line of lines) {
-    if (line.unitCopper == null || isCorpseCoins(line.itemName)) continue;
-    lootWorthByPerson.set(
-      line.personId,
-      (lootWorthByPerson.get(line.personId) ?? 0) + line.quantity * line.unitCopper,
-    );
-  }
-  let allActiveLootWorth = 0;
-  for (const personId of activeLootPersonIds) {
-    allActiveLootWorth += lootWorthByPerson.get(personId) ?? 0;
-  }
-
-  function onLootTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    const count = lootTabIds.length;
-    if (count === 0) return;
-    let next = index;
-    if (event.key === "ArrowRight") next = (index + 1) % count;
-    else if (event.key === "ArrowLeft") next = (index - 1 + count) % count;
-    else if (event.key === "Home") next = 0;
-    else if (event.key === "End") next = count - 1;
-    else return;
-    event.preventDefault();
-    const id = lootTabIds[next];
-    if (!id) return;
-    setLootPersonId(id);
-    document.getElementById(lootTabId(id))?.focus();
-  }
 
   return (
     <div className="grid gap-4">
@@ -820,6 +844,159 @@ export function GroupScreen() {
       ) : (
       <>
       <div
+        role="tabpanel"
+        id={`group-screen-panel-${screenTab}`}
+        aria-labelledby={`group-screen-tab-${screenTab}`}
+        className="grid gap-4"
+      >
+
+      {screenTab === "overview" || screenTab === "loot" ? (
+        <div
+          className={cn(
+            "grid gap-4",
+            party && view?.split ? "lg:grid-cols-[24rem_minmax(0,1fr)] lg:items-start" : undefined,
+          )}
+        >
+          {party && view?.split ? (
+            <MemberRail
+              members={settlementMembers(view.split.balances)}
+              totalCopper={settlementMembers(view.split.balances).reduce((sum, row) => sum + row.lootedCopper, 0)}
+              subtitle={
+                <>
+                  {copy.group.since(stamp(party.startedAt))} {copy.group.lootSummary(lines.length)}
+                  {commonShare != null ? (
+                    <>
+                      {" · "}
+                      <span className="whitespace-nowrap">
+                        {copy.group.railShareEach} <CoinAmount copper={commonShare} omitZeros />
+                      </span>
+                    </>
+                  ) : null}
+                </>
+              }
+              rowNote={(row) => {
+                const presence = party.presences.find((candidate) => candidate.id === row.key);
+                const notes: string[] = [];
+                if (presence?.leftAt) notes.push(copy.group.noteLeft(shortTime(presence.leftAt, locale)));
+                else if (presence && Date.parse(presence.joinedAt) - Date.parse(party.startedAt) > 60_000) {
+                  notes.push(copy.group.noteArrived(shortTime(presence.joinedAt, locale)));
+                }
+                if (commonShare == null || Math.abs(row.shareCopper - commonShare) > 1) {
+                  notes.push(copy.group.noteShare(coins(row.shareCopper)));
+                }
+                return notes.length > 0 ? notes.join(" · ") : null;
+              }}
+              selectedKey={
+                screenTab === "loot" && selectedLootPersonId !== LOOT_TAB_ALL
+                  ? (settlementMembers(view.split.balances).find(
+                      (row) => lootPersonForRow(row, lootPeople)?.id === selectedLootPersonId,
+                    )?.key ?? null)
+                  : null
+              }
+              onSelect={{
+                // Only members with loot in this pot have a Loot filter to show.
+                canSelect: (row) => lootPersonForRow(row, lootPeople) != null,
+                select: (row) => {
+                  const person = lootPersonForRow(row, lootPeople);
+                  if (!person) return;
+                  const again = screenTab === "loot" && selectedLootPersonId === person.id;
+                  setScreenTab("loot");
+                  setLootPersonId(again ? LOOT_TAB_ALL : person.id);
+                },
+              }}
+              selectLabel={(row) => copy.group.showLootOf(row.name)}
+              rowActions={(row) => {
+                const presence = party.presences.find((candidate) => candidate.id === row.key);
+                if (!presence) return null;
+                return (
+                  <>
+                    <RowIconButton
+                      label={`${copy.group.settle} ${presence.name}`}
+                      hidden={row.balanceCopper === 0}
+                      disabled={saving}
+                      onClick={() => setSettling(presence)}
+                    >
+                      <Equal className="size-4" strokeWidth={2.75} aria-hidden />
+                    </RowIconButton>
+                    <RowIconButton
+                      label={`${copy.group.leave} ${presence.name}`}
+                      hidden={presence.leftAt != null}
+                      disabled={saving}
+                      onClick={() => setLeaving(presence)}
+                    >
+                      <X className="size-3.5" strokeWidth={2.75} aria-hidden />
+                    </RowIconButton>
+                  </>
+                );
+              }}
+            >
+              {view.gameParty ? (
+                <GamePartyPrompt
+                  key={party.id}
+                  partyId={party.id}
+                  proposals={view.gameParty}
+                  activeCount={party.presences.filter((presence) => presence.leftAt == null).length}
+                  saving={saving}
+                  onAdd={(arrivals) => void addGameArrivals(arrivals)}
+                  onLeave={(presenceId, at) => void leave(presenceId, at)}
+                  onSettleAndLeave={(presenceId, at) => void settleAndLeave(presenceId, at)}
+                  onClose={() => setCloseOpen(true)}
+                />
+              ) : null}
+              <form
+                className="flex items-center gap-1.5"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (saving || guestLabel.trim() === "") return;
+                  void addMember();
+                }}
+              >
+                <div className="min-w-0 flex-1">
+                  <GuestNameInput
+                    id="add-member"
+                    value={guestLabel}
+                    placeholder={copy.group.addMemberPlaceholder}
+                    suggestions={playerSuggestions}
+                    listLabel={copy.group.nameSuggestions}
+                    disabled={saving}
+                    onChange={onGuestNameChange}
+                    onEnterCommit={(name, personId) => {
+                      if (saving) return;
+                      void addMember({ name, personId });
+                    }}
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  variant="outline"
+                  size="sm"
+                  aria-label={copy.group.addMember}
+                  disabled={saving || guestLabel.trim() === ""}
+                >
+                  {copy.common.add}
+                </Button>
+              </form>
+              <RecentPlayersBesideAdd
+                players={recentToAdd}
+                addingKey={addingKey}
+                saving={saving}
+                copy={copy}
+                compact
+                onAdd={(player) => void addRecentToGroup(player)}
+                onDismiss={(player) => void dismissRecentPlayerFromList(player)}
+              />
+              <div className="flex flex-wrap gap-1.5 border-t border-border pt-3">
+                <Button type="button" size="sm" disabled={saving} onClick={() => setCloseOpen(true)}>
+                  {copy.group.close}
+                </Button>
+                <Button type="button" variant="ghost" size="sm" className="text-destructive" disabled={saving} onClick={() => setResetOpen(true)}>
+                  {copy.group.reset}
+                </Button>
+              </div>
+            </MemberRail>
+          ) : null}
+          <div className="grid min-w-0 gap-4">
+      <div
         role="tablist"
         aria-label={copy.group.screenTabs}
         className="flex w-full gap-1 border-b-2 border-[#6e5338]/50"
@@ -857,36 +1034,21 @@ export function GroupScreen() {
             >
               {tab.label}
               {tab.badge != null ? (
-                <span className="rounded-full bg-[#6e5338]/15 px-1.5 font-body text-xs tabular-nums text-foreground">
+                <span
+                  title={copy.group.unpricedBadge(tab.badge)}
+                  className="inline-flex items-center gap-1 rounded-full bg-[#b7791f]/15 px-1.5 py-px font-body text-xs tabular-nums text-[#8a5a12]"
+                >
+                  <TriangleAlert className="size-3.5" strokeWidth={2.5} aria-hidden />
                   {tab.badge}
+                  <span className="sr-only">{copy.group.unpricedBadge(tab.badge)}</span>
                 </span>
               ) : null}
             </button>
           );
         })}
       </div>
-
-      <div
-        role="tabpanel"
-        id={`group-screen-panel-${screenTab}`}
-        aria-labelledby={`group-screen-tab-${screenTab}`}
-        className="grid gap-4"
-      >
-
       {screenTab === "overview" ? (
-        <div
-          className={cn(
-            "grid gap-4",
-            party && view?.split ? "lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start" : undefined,
-          )}
-        >
-          {party && view?.split ? (
-            <MemberRail
-              members={settlementMembers(view.split.balances)}
-              totalCopper={settlementMembers(view.split.balances).reduce((sum, row) => sum + row.lootedCopper, 0)}
-            />
-          ) : null}
-          <div className="grid min-w-0 gap-4">
+      <>
       {showUnpricedHint ? (
         <Alert>
           <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
@@ -898,66 +1060,13 @@ export function GroupScreen() {
         </Alert>
       ) : null}
 
-      {view ? (
+      {view && !party ? (
         <Card>
-          <CardHeader className={party ? "gap-2" : undefined}>
-            {party ? (
-              <button
-                type="button"
-                id="group-members-card-heading"
-                className="flex w-full items-start justify-between gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-[#7a4503]/40"
-                aria-expanded={membersOpen}
-                aria-controls="group-members-block"
-                aria-label={
-                  membersOpen ? copy.group.membersHideDetails : copy.group.membersShowDetails
-                }
-                onClick={() => setMembersOpen((open) => !open)}
-              >
-                <CardTitle as="h3">{copy.group.members}</CardTitle>
-                <ChevronDown
-                  className={cn(
-                    "mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform",
-                    membersOpen ? "rotate-180" : "rotate-0",
-                  )}
-                  aria-hidden
-                />
-              </button>
-            ) : (
-              <CardTitle as="h3">{copy.group.members}</CardTitle>
-            )}
-            <CardDescription>
-              {party ? (
-                membersOpen ? (
-                  <>
-                    {copy.group.since(stamp(party.startedAt))} {copy.group.lootSummary(lines.length)}.{" "}
-                    <CoinPhrase
-                      text={copy.group.knownValue(COIN_SLOT)}
-                      amounts={[knownValue]}
-                    />
-                    {". "}
-                    {/* Unpriced count lives in the Overview hint + Loot tab badge (C2). */}
-                    {copy.group.lateJoin}
-                  </>
-                ) : (
-                  <CoinPhrase
-                    text={copy.group.membersCollapsedSummary(
-                      stamp(party.startedAt),
-                      lines.length,
-                      COIN_SLOT,
-                    )}
-                    amounts={[knownValue]}
-                  />
-                )
-              ) : (
-                copy.group.draftHelp
-              )}
-            </CardDescription>
+          <CardHeader>
+            <CardTitle as="h3">{copy.group.members}</CardTitle>
+            <CardDescription>{copy.group.draftHelp}</CardDescription>
           </CardHeader>
-          <CardContent
-            id={party ? "group-members-block" : undefined}
-            className="grid gap-4"
-          >
-            {!party ? (
+          <CardContent className="grid gap-4">
               <div className="grid gap-4 md:grid-cols-2 md:items-start md:gap-0">
                 <section className="grid min-w-0 gap-3 md:pr-6" aria-labelledby="group-machine-heading">
                   <div className="grid gap-1">
@@ -1079,176 +1188,6 @@ export function GroupScreen() {
                   </Button>
                 </section>
               </div>
-            ) : (
-              <section className="grid gap-3" aria-labelledby="group-members-card-heading">
-                {(() => {
-                  const active = party.presences.filter((presence) => presence.leftAt == null);
-                  const departed = party.presences.filter((presence) => presence.leftAt != null);
-                  const renderPresence = (
-                    presence: (typeof party.presences)[number],
-                    here: boolean,
-                  ) => {
-                    const row = view.split?.balances.find((balance) => balance.key === presence.id);
-                    return (
-                      <li
-                        key={presence.id}
-                        className={[
-                          "grid grid-cols-[1fr_auto] items-center gap-2 border-b border-border pb-2",
-                          here ? "" : "text-muted-foreground",
-                        ].join(" ")}
-                      >
-                        <div className="min-w-0">
-                          <p className="inline-flex items-center gap-1.5">
-                            {here ? (
-                              <User
-                                className="size-3.5 shrink-0 text-muted-foreground"
-                                aria-hidden
-                              />
-                            ) : null}
-                            <span>
-                              {presence.name}
-                              <span className="text-muted-foreground">
-                                {" "}
-                                ·{" "}
-                                {here
-                                  ? copy.group.arrived(stamp(presence.joinedAt))
-                                  : copy.group.left(stamp(presence.leftAt ?? ""))}
-                              </span>
-                            </span>
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap justify-end gap-2">
-                          {here ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={saving}
-                              aria-label={`${copy.group.leave} ${presence.name}`}
-                              onClick={() => setLeaving(presence)}
-                            >
-                              {copy.group.leave}
-                            </Button>
-                          ) : null}
-                          {row && row.balanceCopper !== 0 ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              disabled={saving}
-                              aria-label={`${copy.group.settle} ${presence.name}`}
-                              onClick={() => setSettling(presence)}
-                            >
-                              {copy.group.settle}
-                            </Button>
-                          ) : null}
-                        </div>
-                      </li>
-                    );
-                  };
-
-                  if (!membersOpen) {
-                    if (active.length === 0) {
-                      return <p className="text-sm text-muted-foreground">{copy.group.nobody}</p>;
-                    }
-                    return (
-                      <ul className="flex flex-wrap gap-x-3 gap-y-1.5 text-sm">
-                        {active.map((presence) => (
-                          <li key={presence.id} className="inline-flex items-center gap-1.5">
-                            <User className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                            <span>{presence.name}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    );
-                  }
-
-                  if (party.presences.length === 0) {
-                    return <p className="text-sm text-muted-foreground">{copy.group.nobody}</p>;
-                  }
-
-                  return (
-                    <>
-                      <div className="grid gap-2">
-                        <h3 id="group-members-list-heading" className="font-heading text-sm font-medium">
-                          {copy.group.membersList}
-                        </h3>
-                        {active.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">{copy.group.nobody}</p>
-                        ) : (
-                          <ul className="grid gap-2 text-sm md:grid-cols-2 md:gap-x-6">
-                            {active.map((presence) => renderPresence(presence, true))}
-                          </ul>
-                        )}
-                      </div>
-                      {departed.length > 0 ? (
-                        <div className="mt-2 grid gap-2 border-t border-[#6e5338]/40 pt-4">
-                          <h3 className="font-heading text-sm font-medium text-muted-foreground">
-                            {copy.group.membersLeft}
-                          </h3>
-                          <ul className="grid gap-2 text-sm md:grid-cols-2 md:gap-x-6">
-                            {departed.map((presence) => renderPresence(presence, false))}
-                          </ul>
-                        </div>
-                      ) : null}
-                    </>
-                  );
-                })()}
-
-                {membersOpen ? (
-                  <>
-                    <form
-                      className="flex flex-wrap items-end gap-2"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        if (saving || guestLabel.trim() === "") return;
-                        void addMember();
-                      }}
-                    >
-                      <div className="grid gap-1.5">
-                        <Label htmlFor="add-member">{copy.group.addMember}</Label>
-                        <GuestNameInput
-                          id="add-member"
-                          value={guestLabel}
-                          placeholder={copy.group.nameInGroup}
-                          suggestions={playerSuggestions}
-                          listLabel={copy.group.nameSuggestions}
-                          disabled={saving}
-                          onChange={onGuestNameChange}
-                          onEnterCommit={(name, personId) => {
-                            if (saving) return;
-                            void addMember({ name, personId });
-                          }}
-                        />
-                      </div>
-                      <Button type="submit" variant="outline" disabled={saving || guestLabel.trim() === ""}>
-                        {copy.common.add}
-                      </Button>
-                    </form>
-                    <RecentPlayersBesideAdd
-                      players={recentToAdd}
-                      addingKey={addingKey}
-                      saving={saving}
-                      copy={copy}
-                      onAdd={(player) => void addRecentToGroup(player)}
-                      onDismiss={(player) => void dismissRecentPlayerFromList(player)}
-                    />
-
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        disabled={saving}
-                        onClick={() => setCloseOpen(true)}
-                      >
-                        {copy.group.close}
-                      </Button>
-                      <Button type="button" variant="destructive" disabled={saving} onClick={() => setResetOpen(true)}>
-                        {copy.group.reset}
-                      </Button>
-                    </div>
-                  </>
-                ) : null}
-              </section>
-            )}
           </CardContent>
         </Card>
       ) : null}
@@ -1262,8 +1201,7 @@ export function GroupScreen() {
           onSettleEveryone={() => void settleEveryone()}
         />
       ) : null}
-          </div>
-        </div>
+      </>
       ) : null}
 
       {screenTab === "loot" && !party ? (
@@ -1307,9 +1245,9 @@ export function GroupScreen() {
             ) : (
               <>
                 {(() => {
-                  const unpricedLoot = stackLootLinesAcrossPeople(
+                  const unpricedLoot = sortLootForDisplay(stackLootLinesAcrossPeople(
                     lines.filter((line) => line.unitCopper == null && !isCorpseCoins(line.itemName)),
-                  );
+                  ), lootSort);
                   if (unpricedLoot.length === 0) return null;
                   return (
                     <div className="grid gap-2 rounded-sm border border-[#6e5338]/55 bg-[#efe6d6]/60 p-3">
@@ -1328,16 +1266,12 @@ export function GroupScreen() {
                             key={`unpriced-${line.id}`}
                             className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 pb-2 last:border-b-0 last:pb-0"
                           >
-                            <span>
-                              {lootLineLabel(line.itemName, copy)}
-                              {line.quantity > 1 ? ` × ${line.quantity}` : ""}
-                              <span className="text-muted-foreground"> · {line.personName}</span>
-                            </span>
+                            <LootItemLabel line={line} copy={copy} holders={<LootHolderNames line={line} />} />
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
-                              className="h-auto"
+                              className="h-auto py-1"
                               disabled={saving}
                               aria-label={`${copy.group.setUnitPrice} ${line.itemName}`}
                               onClick={() => {
@@ -1353,80 +1287,60 @@ export function GroupScreen() {
                     </div>
                   );
                 })()}
-                <div className="flex flex-wrap gap-2" role="tablist" aria-label={copy.group.potTabs} aria-orientation="horizontal">
-                  <Button
-                    id={lootTabId(LOOT_TAB_ALL)}
-                    type="button"
-                    role="tab"
-                    variant={selectedLootPersonId === LOOT_TAB_ALL ? "default" : "outline"}
-                    className="gap-1.5"
-                    aria-selected={selectedLootPersonId === LOOT_TAB_ALL}
-                    aria-controls={lootPanelId(LOOT_TAB_ALL)}
-                    tabIndex={selectedLootPersonId === LOOT_TAB_ALL ? 0 : -1}
-                    aria-label={`${copy.group.potTabAllHelp}, ${coins(allActiveLootWorth)}`}
-                    onClick={() => setLootPersonId(LOOT_TAB_ALL)}
-                    onKeyDown={(event) => onLootTabKeyDown(event, 0)}
-                  >
-                    {copy.group.potTabAll}
-                    <CoinAmount
-                      copper={allActiveLootWorth}
-                      omitZeros
-                      className="text-[0.6875rem] font-normal opacity-90"
-                    />
-                  </Button>
-                  {lootPeople.map((person, index) => {
-                    const selected = person.id === selectedLootPersonId;
-                    const left = lootPersonLeftGroup(person, party);
-                    const worth = lootWorthByPerson.get(person.id) ?? 0;
-                    return (
-                      <Button
-                        key={person.id}
-                        id={lootTabId(person.id)}
-                        type="button"
-                        role="tab"
-                        variant={selected ? "default" : "outline"}
-                        className={cn("gap-1.5", left ? "opacity-55" : undefined)}
-                        aria-selected={selected}
-                        aria-controls={lootPanelId(person.id)}
-                        tabIndex={selected ? 0 : -1}
-                        aria-label={
-                          left
-                            ? `${copy.group.potTab(person.name)} · ${copy.group.membersLeft}, ${coins(worth)}`
-                            : `${copy.group.potTab(person.name)}, ${coins(worth)}`
-                        }
-                        onClick={() => setLootPersonId(person.id)}
-                        onKeyDown={(event) => onLootTabKeyDown(event, index + 1)}
-                      >
-                        {person.name}
-                        <CoinAmount
-                          copper={worth}
-                          omitZeros
-                          className="text-[0.6875rem] font-normal opacity-90"
-                        />
-                      </Button>
-                    );
-                  })}
-                </div>
                 <div
-                  role="tabpanel"
-                  id={lootPanelId(LOOT_TAB_ALL)}
-                  aria-labelledby={lootTabId(LOOT_TAB_ALL)}
-                  hidden={selectedLootPersonId !== LOOT_TAB_ALL}
+                  className={cn(
+                    "flex flex-wrap items-center justify-between gap-2 rounded-sm px-3 py-1.5 text-sm",
+                    selectedLootPersonId !== LOOT_TAB_ALL ? "bg-[#efe6d6]" : "bg-[#efe6d6]/40",
+                  )}
                 >
+                  {selectedLootPersonId !== LOOT_TAB_ALL ? (
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="font-heading">
+                        {copy.group.lootFilteredOn(
+                          lootPeople.find((person) => person.id === selectedLootPersonId)?.name ?? "",
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-muted-foreground hover:bg-[#6e5338]/12 hover:text-foreground"
+                        onClick={() => setLootPersonId(LOOT_TAB_ALL)}
+                      >
+                        <X className="size-3.5" strokeWidth={2.5} aria-hidden />
+                        {copy.group.lootShowAll}
+                      </button>
+                    </span>
+                  ) : (
+                    <span className="font-heading text-muted-foreground">{copy.group.lootAllMembers}</span>
+                  )}
+                  <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                    {copy.group.lootSortLabel}
+                    <span role="radiogroup" aria-label={copy.group.lootSortLabel} className="inline-flex overflow-hidden rounded-sm border border-[#6e5338]/45 bg-card">
+                      {(["recent", "value"] as const).map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          role="radio"
+                          aria-checked={lootSort === mode}
+                          onClick={() => setLootSort(mode)}
+                          className={cn(
+                            "px-2 py-0.5 transition-colors first:border-r first:border-[#6e5338]/30",
+                            lootSort === mode ? "bg-[#6e5338] text-[#f7f3ea]" : "hover:bg-[#efe6d6]",
+                          )}
+                        >
+                          {mode === "recent" ? copy.group.lootSortRecent : copy.group.lootSortValue}
+                        </button>
+                      ))}
+                    </span>
+                  </span>
+                </div>
+                <div hidden={selectedLootPersonId !== LOOT_TAB_ALL}>
                   <ul className="scrollbar-theme grid max-h-80 gap-2 overflow-auto text-sm">
                     {allActiveLoot.map((line) => (
                       <li
                         key={`all-${line.id}`}
                         className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2"
                       >
-                        <span className="min-w-0">
-                          {lootLineLabel(line.itemName, copy)}
-                          {line.quantity > 1 ? ` × ${line.quantity}` : ""}
-                          <span className="text-muted-foreground">
-                            {" · "}
-                            <LootHolderNames line={line} />
-                          </span>
-                        </span>
+                        <LootItemLabel line={line} copy={copy} holders={<LootHolderNames line={line} />} />
                         {isCorpseCoins(line.itemName) ? (
                           <LootLinePriceDisplay line={line} />
                         ) : (
@@ -1434,7 +1348,7 @@ export function GroupScreen() {
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="h-auto"
+                            className="h-auto py-1"
                             disabled={saving}
                             aria-label={`${copy.group.setUnitPrice} ${line.itemName}, ${lootPriceLabel(line, copy, coins)}`}
                             onClick={() => {
@@ -1456,9 +1370,6 @@ export function GroupScreen() {
                   return (
                     <div
                       key={person.id}
-                      role="tabpanel"
-                      id={lootPanelId(person.id)}
-                      aria-labelledby={lootTabId(person.id)}
                       hidden={person.id !== selectedLootPersonId}
                       className={left ? "opacity-55" : undefined}
                     >
@@ -1470,11 +1381,7 @@ export function GroupScreen() {
                               key={line.id}
                               className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2"
                             >
-                              <span>
-                                {lootLineLabel(line.itemName, copy)}
-                                {line.quantity > 1 ? ` × ${line.quantity}` : ""}
-                                <span className="text-muted-foreground"> · {line.personName}</span>
-                              </span>
+                              <LootItemLabel line={line} copy={copy} />
                               {isCorpseCoins(line.itemName) ? (
                                 <LootLinePriceDisplay line={line} />
                               ) : (
@@ -1482,7 +1389,7 @@ export function GroupScreen() {
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  className="h-auto"
+                                  className="h-auto py-1"
                                   disabled={saving}
                                   aria-label={`${copy.group.setUnitPrice} ${line.itemName}, ${lootPriceLabel(line, copy, coins)}`}
                                   onClick={() => {
@@ -1506,6 +1413,87 @@ export function GroupScreen() {
           </CardContent>
           ) : null}
         </Card>
+      ) : null}
+
+      {screenTab === "loot" ? (
+      <Card>
+        <CollapsibleCardHeader
+          headingId="group-pending-heading"
+          panelId="group-pending-block"
+          title={copy.home.pendingTitle}
+          open={pendingOpen}
+          onToggle={() => setPendingOpen((open) => !open)}
+          showLabel={copy.group.collapseShow}
+          hideLabel={copy.group.collapseHide}
+          openDescription={copy.home.pendingBody}
+          closedDescription={copy.group.pendingCollapsedSummary(pending.length)}
+        />
+        {pendingOpen ? (
+        <CardContent id="group-pending-block" className="grid gap-3">
+          {pending.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{copy.home.pendingEmpty}</p>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={dismissingAll || dismissingId != null}
+                  onClick={() => void dismissAllPending()}
+                >
+                  {copy.home.pendingDismissAll}
+                </Button>
+              </div>
+              <ul className="grid gap-3">
+                {pending.map((item) => (
+                  <li
+                    key={item.id}
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-1 border-b border-border/60 pb-3 last:border-b-0 last:pb-0"
+                  >
+                    <div className="min-w-0 grid gap-1">
+                      <p className="font-medium leading-snug">
+                        {item.itemName}{" "}
+                        <span className="text-muted-foreground font-normal tabular-nums">
+                          {copy.home.pendingQty(item.quantity)}
+                        </span>
+                      </p>
+                      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
+                        {item.unitCopper == null || item.lineCopper == null ? (
+                          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <UnknownPrice />
+                            <span className="sr-only">{copy.home.pendingUnpriced}</span>
+                          </span>
+                        ) : (
+                          <CoinPhrase
+                            text={copy.home.pendingLineCalc(item.quantity)}
+                            amounts={[item.unitCopper, item.lineCopper]}
+                            omitZeros={[true, true]}
+                          />
+                        )}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      disabled={dismissingAll || dismissingId === item.id}
+                      onClick={() => void dismissPending(item.id)}
+                    >
+                      {copy.home.pendingDismiss}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </CardContent>
+        ) : null}
+      </Card>
+      ) : null}
+          </div>
+        </div>
       ) : null}
 
 
@@ -1588,83 +1576,6 @@ export function GroupScreen() {
         </DialogContent>
       </Dialog>
 
-      {screenTab === "sell" ? (
-      <Card>
-        <CollapsibleCardHeader
-          headingId="group-pending-heading"
-          panelId="group-pending-block"
-          title={copy.home.pendingTitle}
-          open={pendingOpen}
-          onToggle={() => setPendingOpen((open) => !open)}
-          showLabel={copy.group.collapseShow}
-          hideLabel={copy.group.collapseHide}
-          openDescription={copy.home.pendingBody}
-          closedDescription={copy.group.pendingCollapsedSummary(pending.length)}
-        />
-        {pendingOpen ? (
-        <CardContent id="group-pending-block" className="grid gap-3">
-          {pending.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{copy.home.pendingEmpty}</p>
-          ) : (
-            <>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={dismissingAll || dismissingId != null}
-                  onClick={() => void dismissAllPending()}
-                >
-                  {copy.home.pendingDismissAll}
-                </Button>
-              </div>
-              <ul className="grid gap-3">
-                {pending.map((item) => (
-                  <li
-                    key={item.id}
-                    className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-1 border-b border-border/60 pb-3 last:border-b-0 last:pb-0"
-                  >
-                    <div className="min-w-0 grid gap-1">
-                      <p className="font-medium leading-snug">
-                        {item.itemName}{" "}
-                        <span className="text-muted-foreground font-normal tabular-nums">
-                          {copy.home.pendingQty(item.quantity)}
-                        </span>
-                      </p>
-                      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
-                        {item.unitCopper == null || item.lineCopper == null ? (
-                          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <UnknownPrice />
-                            <span className="sr-only">{copy.home.pendingUnpriced}</span>
-                          </span>
-                        ) : (
-                          <CoinPhrase
-                            text={copy.home.pendingLineCalc(item.quantity)}
-                            amounts={[item.unitCopper, item.lineCopper]}
-                            omitZeros={[true, true]}
-                          />
-                        )}
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="shrink-0"
-                      disabled={dismissingAll || dismissingId === item.id}
-                      onClick={() => void dismissPending(item.id)}
-                    >
-                      {copy.home.pendingDismiss}
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </CardContent>
-        ) : null}
-      </Card>
-      ) : null}
       </div>
       </>
       )}
@@ -1672,7 +1583,7 @@ export function GroupScreen() {
   );
 }
 
-type GroupScreenTab = "overview" | "loot" | "sell";
+type GroupScreenTab = "overview" | "loot";
 
 /** Closed group, read-only: who held what and the last split proposal. */
 function ArchivedGroup({ view, onBack }: { view: PartyView; onBack: () => void }) {
@@ -1711,14 +1622,7 @@ function ArchivedGroup({ view, onBack }: { view: PartyView; onBack: () => void }
             <ul className="scrollbar-theme grid max-h-96 gap-2 overflow-auto text-sm">
               {stacked.map((line) => (
                 <li key={`archive-${line.id}`} className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
-                  <span className="min-w-0">
-                    {lootLineLabel(line.itemName, copy)}
-                    {line.quantity > 1 ? ` × ${line.quantity}` : ""}
-                    <span className="text-muted-foreground">
-                      {" · "}
-                      <LootHolderNames line={line} />
-                    </span>
-                  </span>
+                  <LootItemLabel line={line} copy={copy} holders={<LootHolderNames line={line} />} />
                   <LootLinePriceDisplay line={line} />
                 </li>
               ))}
@@ -1755,10 +1659,10 @@ function SplitResult({
   const transfers = split.mode === "value" ? split.transfers : settleEveryone(members);
   const settled = split.mode === "value" ? split.settled : [];
   const everyoneEven = members.every((row) => row.balanceCopper === 0);
-  // One scale for every recap bar so lengths compare across players.
-  const recapScale = Math.max(1, ...members.map((row) => Math.max(row.lootedCopper, row.shareCopper)));
   // Item loot only — corpse coins are already split in-game and must not feed /split or primary totals.
-  const { lootCopper } = potSessionTotals(lines);
+  const { lootCopper, splitCoinCopper } = potSessionTotals(lines);
+  // Display only: corpse coins are shown beside item loot but never enter the split math.
+  const sessionCopper = lootCopper + splitCoinCopper;
   const gameSplitCommand = splitCommand(lootCopper);
   // Content signature — avoid resetting copy feedback when `transfers` is a new array with the same tips.
   const chatAnnounceKey = transfers
@@ -1897,9 +1801,21 @@ function SplitResult({
       />
       {splitOpen ? (
       <CardContent id="group-split-block" className="grid gap-5">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-[#6e5338]/55 bg-[#f7f3ea] px-3 py-2.5">
-          <p className="font-heading text-sm font-medium text-foreground">{copy.group.lootValueTotal}</p>
-          <CoinAmount copper={lootCopper} className="text-xl font-semibold text-foreground" />
+        {/* Side by side only when the column is wide enough for every language on one line;
+            otherwise Session totals drops to its own row (labels never wrap). */}
+        <div className="@container">
+        <div className="flex flex-col gap-2 rounded-sm border border-[#6e5338]/55 bg-[#f7f3ea] p-3 @[40rem]:flex-row @[40rem]:items-center @[40rem]:justify-between @[40rem]:gap-4">
+          <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 text-[0.9375rem] text-muted-foreground">
+            <span className="whitespace-nowrap">{copy.group.lootValueTotal}</span>
+            <CoinAmount copper={lootCopper} className="justify-self-end text-[0.9375rem] font-medium text-muted-foreground" />
+            <span className="whitespace-nowrap">{copy.group.coinsAlreadySplit}</span>
+            <CoinAmount copper={splitCoinCopper} className="justify-self-end text-[0.9375rem] font-medium text-muted-foreground" />
+          </div>
+          <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[#6e5338]/35 pt-2 @[40rem]:grid @[40rem]:gap-0.5 @[40rem]:border-t-0 @[40rem]:border-l @[40rem]:pt-0 @[40rem]:pl-4">
+            <p className="font-heading text-sm font-medium whitespace-nowrap">{copy.group.potTotals}</p>
+            <CoinAmount copper={sessionCopper} className="text-xl font-semibold text-foreground" />
+          </div>
+        </div>
         </div>
 
         <div className="grid gap-2 rounded-sm border-2 border-[#6e5338]/70 bg-[#efe6d6]/50 p-3">
@@ -1951,10 +1867,11 @@ function SplitResult({
                   </button>
                 ))}
               </div>
-              {shareTab === "chat" ? (
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span>{copy.group.chatRoundLabel}</span>
-                  <ChatRoundPicker
+              <div className="min-h-16 rounded-sm border border-[#6e5338]/35 bg-card px-3 py-2.5 font-mono text-sm leading-relaxed break-words text-foreground">
+                {shareTab === "chat" ? (
+                  // Rounding is set from the chip inside the announce itself.
+                  <ChatAnnounceWithRound
+                    message={chatMessages[chatPart % chatMessages.length] ?? ""}
                     value={roundCopper}
                     onChange={applyRoundStep}
                     label={copy.group.chatRoundLabel}
@@ -1962,11 +1879,10 @@ function SplitResult({
                     customPlaceholder={copy.group.chatRoundCustomPlaceholder}
                     customApply={copy.group.chatRoundCustomApply}
                   />
-                </div>
-              ) : null}
-              <p className="min-h-16 rounded-sm border border-[#6e5338]/35 bg-card px-3 py-2.5 font-mono text-sm leading-relaxed break-words text-foreground">
-                {shareTab === "chat" ? (chatMessages[chatPart % chatMessages.length] ?? "") : gameSplitCommand}
-              </p>
+                ) : (
+                  gameSplitCommand
+                )}
+              </div>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs text-muted-foreground">
                   {shareTab === "chat"
@@ -2005,14 +1921,6 @@ function SplitResult({
           </div>
         </div>
 
-        <div className="grid gap-2">
-          <h4 className="font-heading text-sm font-medium">{copy.group.eachHolds}</h4>
-          <ul className="grid gap-3 md:grid-cols-2">
-            {members.map((row) => (
-              <PlayerRecapCard key={row.key} row={row} scale={recapScale} />
-            ))}
-          </ul>
-        </div>
       </CardContent>
       ) : null}
     </Card>
@@ -2208,6 +2116,7 @@ function RecentPlayersBesideAdd({
   addingKey,
   saving,
   copy,
+  compact = false,
   onAdd,
   onDismiss,
 }: {
@@ -2215,14 +2124,16 @@ function RecentPlayersBesideAdd({
   addingKey: string | null;
   saving: boolean;
   copy: Copy;
+  /** Members panel: smaller label and chips. */
+  compact?: boolean;
   onAdd: (player: RecentPlayer) => void;
   onDismiss: (player: RecentPlayer) => void;
 }) {
   if (players.length === 0) return null;
   return (
     <div className="grid gap-1.5">
-      <p className="text-sm text-muted-foreground">{copy.home.playersTitle}</p>
-      <ul className="flex flex-wrap gap-2">
+      <p className={compact ? "text-xs text-muted-foreground" : "text-sm text-muted-foreground"}>{copy.home.playersTitle}</p>
+      <ul className={cn("flex flex-wrap", compact ? "gap-1.5" : "gap-2")}>
         {players.map((player) => {
           const key = playerKey(player);
           const busy = addingKey === key || saving;
@@ -2233,7 +2144,7 @@ function RecentPlayersBesideAdd({
                 variant="outline"
                 size="sm"
                 disabled={busy}
-                className="pr-5"
+                className={compact ? "h-7 px-2 pr-5 text-xs" : "pr-5"}
                 onClick={() => onAdd(player)}
               >
                 {player.name}
@@ -2281,6 +2192,27 @@ function lootPriceLabel(line: PotLine, copy: Copy, coins: (amount: number) => st
 }
 
 /** Names on the All tab, with each holder's quantity when the row is stacked. */
+/** Item on its own line (name + quantity), who picked it up on a quieter second line. */
+function LootItemLabel({
+  line,
+  copy,
+  holders,
+}: {
+  line: Pick<PotLine, "itemName" | "quantity">;
+  copy: Copy;
+  holders?: ReactNode;
+}) {
+  return (
+    <span className="grid min-w-0 gap-0.5">
+      <span className="font-medium text-foreground">
+        {lootLineLabel(line.itemName, copy)}
+        {line.quantity > 1 ? <span className="font-normal tabular-nums text-muted-foreground"> × {line.quantity}</span> : null}
+      </span>
+      {holders ? <span className="text-xs text-muted-foreground">{holders}</span> : null}
+    </span>
+  );
+}
+
 function LootHolderNames({ line }: { line: StackedAcrossPeopleLine | PotLine }) {
   const holders: LootHolderShare[] =
     "holders" in line && Array.isArray(line.holders) && line.holders.length > 0
@@ -2298,7 +2230,7 @@ function LootHolderNames({ line }: { line: StackedAcrossPeopleLine | PotLine }) 
     <>
       {holders.map((holder, index) => (
         <span key={holder.personId}>
-          {index > 0 ? ", " : null}
+          {index > 0 ? " · " : null}
           {holder.personName}
           {showQty ? <span className="tabular-nums"> ×{holder.quantity}</span> : null}
         </span>
@@ -2308,22 +2240,8 @@ function LootHolderNames({ line }: { line: StackedAcrossPeopleLine | PotLine }) 
 }
 
 function LootLinePriceDisplay({ line }: { line: PotLine }) {
-  const { copy } = useI18n();
   if (line.unitCopper == null) return <UnknownPrice />;
-  const total = lootLineTotalCopper(line) ?? line.unitCopper;
-  if (line.quantity > 1 && !isCorpseCoins(line.itemName)) {
-    return (
-      <span className="inline-flex flex-wrap items-center gap-x-1">
-        <CoinAmount copper={total} />
-        <span className="inline-flex items-center gap-1">
-          <span aria-hidden>(</span>
-          <CoinAmount copper={line.unitCopper} omitZeros />
-          <span>{copy.prices.each})</span>
-        </span>
-      </span>
-    );
-  }
-  return <CoinAmount copper={isCorpseCoins(line.itemName) ? total : line.unitCopper} />;
+  return <CoinAmount copper={lootLineTotalCopper(line) ?? line.unitCopper} />;
 }
 
 function isCorpseCoins(itemName: string): boolean {
@@ -2332,4 +2250,158 @@ function isCorpseCoins(itemName: string): boolean {
 
 function lootLineLabel(itemName: string, copy: Copy): string {
   return isCorpseCoins(itemName) ? copy.common.corpseCoins : itemName;
+}
+
+/** "02:10" style time for compact member notes. */
+function shortTime(iso: string, locale: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+}
+
+/** Hidden in-game proposals for this group (per viewer; a new event shows again). */
+function readDismissed(partyId: string): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(`mnm:game-party-dismissed:${partyId}`);
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeDismissed(partyId: string, keys: Set<string>) {
+  try {
+    window.localStorage.setItem(`mnm:game-party-dismissed:${partyId}`, JSON.stringify([...keys]));
+  } catch {
+    /* private mode: dismissals just don't persist */
+  }
+}
+
+/**
+ * Semi-automatic in-game party follow-up: offers to add new party members (at their join time)
+ * and to settle / leave members the game saw leave (at their leave time). Nothing is applied
+ * without a click. When everyone left (party disbanded), offers to close the group instead.
+ */
+function GamePartyPrompt({
+  partyId,
+  proposals,
+  activeCount,
+  saving,
+  onAdd,
+  onLeave,
+  onSettleAndLeave,
+  onClose,
+}: {
+  partyId: string;
+  proposals: GamePartyProposals;
+  activeCount: number;
+  saving: boolean;
+  onAdd: (arrivals: Array<{ name: string; since: string }>) => void;
+  onLeave: (presenceId: string, at: string) => void;
+  onSettleAndLeave: (presenceId: string, at: string) => void;
+  onClose: () => void;
+}) {
+  const { copy, locale } = useI18n();
+  const [dismissed, setDismissed] = useState(() => readDismissed(partyId));
+  const keyOf = (name: string, at: string) => `${name.toLowerCase()}|${at}`;
+  const arrivals = proposals.arrivals.filter((arrival) => !dismissed.has(keyOf(arrival.name, arrival.since)));
+  const departures = proposals.departures.filter((departure) => !dismissed.has(keyOf(departure.name, departure.at)));
+  if (arrivals.length === 0 && departures.length === 0) return null;
+
+  function dismiss(keys: string[]) {
+    const next = new Set(dismissed);
+    for (const key of keys) next.add(key);
+    setDismissed(next);
+    writeDismissed(partyId, next);
+  }
+
+  const time = (iso: string) => shortTime(iso, locale);
+  const everyoneLeft = departures.length > 0 && departures.length >= activeCount;
+  const lastLeave = departures.reduce((latest, departure) => (departure.at > latest ? departure.at : latest), "");
+
+  return (
+    <div className="grid gap-2 rounded-sm border border-[#b7791f]/40 bg-[#b7791f]/8 p-2.5 text-sm">
+      <p className="font-heading text-sm">{copy.group.gameTitle}</p>
+
+      {arrivals.length > 0 ? (
+        <div className="grid gap-1.5">
+          <ul className="grid gap-1">
+            {arrivals.map((arrival) => (
+              <li key={arrival.name} className="flex items-center justify-between gap-2">
+                <span>
+                  <span className="font-medium">{arrival.name}</span>{" "}
+                  <span className="text-xs text-muted-foreground">{copy.group.gameJoinedAt(time(arrival.since))}</span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <Button type="button" size="sm" variant="outline" className="h-7 px-2" disabled={saving} onClick={() => onAdd([arrival])}>
+                    {copy.common.add}
+                  </Button>
+                  <RowIconButton label={copy.group.gameDismiss} onClick={() => dismiss([keyOf(arrival.name, arrival.since)])}>
+                    <X className="size-3.5" strokeWidth={2.5} aria-hidden />
+                  </RowIconButton>
+                </span>
+              </li>
+            ))}
+          </ul>
+          {arrivals.length > 1 ? (
+            <Button type="button" size="sm" className="h-7 justify-self-start px-2.5" disabled={saving} onClick={() => onAdd(arrivals)}>
+              {copy.group.gameAddAll(arrivals.length)}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {everyoneLeft ? (
+        <div className="grid gap-1.5">
+          <p>{copy.group.gameEnded(time(lastLeave))}</p>
+          <span className="flex flex-wrap gap-1.5">
+            <Button type="button" size="sm" className="h-7 px-2.5" disabled={saving} onClick={onClose}>
+              {copy.group.close}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2.5"
+              onClick={() => dismiss(departures.map((departure) => keyOf(departure.name, departure.at)))}
+            >
+              {copy.group.gameDismiss}
+            </Button>
+          </span>
+        </div>
+      ) : departures.length > 0 ? (
+        <ul className="grid gap-1.5">
+          {departures.map((departure) => (
+            <li key={departure.presenceId} className="grid gap-1">
+              <span>{copy.group.gameLeftAt(departure.name, time(departure.at))}</span>
+              <span className="flex flex-wrap items-center gap-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-7 px-2.5"
+                  disabled={saving}
+                  onClick={() => onSettleAndLeave(departure.presenceId, departure.at)}
+                >
+                  {copy.group.gameSettleLeave}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2.5"
+                  disabled={saving}
+                  onClick={() => onLeave(departure.presenceId, departure.at)}
+                >
+                  {copy.group.leave}
+                </Button>
+                <RowIconButton label={copy.group.gameDismiss} onClick={() => dismiss([keyOf(departure.name, departure.at)])}>
+                  <X className="size-3.5" strokeWidth={2.5} aria-hidden />
+                </RowIconButton>
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
 }

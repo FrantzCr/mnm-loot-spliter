@@ -5,12 +5,12 @@ import { DatabaseSync } from "node:sqlite";
 import { ErrorCode } from "./codes";
 import { characterKey, cleanText, itemKey } from "./format";
 import { isValidCopper } from "./money";
-import { COIN_LOOT_ITEM_NAME, type ParsedLoot, type ParsedSale } from "./ledger-parse";
+import { COIN_LOOT_ITEM_NAME, type ParsedLoot, type ParsedPartyEvent, type ParsedSale } from "./ledger-parse";
 import { unitPriceFromSale } from "./sale-price";
 
 const globalForDb = globalThis as unknown as { registreDb?: DatabaseSync; registreSchema?: number };
 
-const SCHEMA = 9;
+const SCHEMA = 12;
 
 const APP_DATA_DIR = "mnm-loot-spliter";
 const LEGACY_APP_DATA_DIRS = ["loot-spliter"] as const;
@@ -194,6 +194,24 @@ function migrate(db: DatabaseSync) {
       dismissed_at TEXT NOT NULL
     );
   `);
+
+  // In-game party events read from Social ledgers (join / leave / disband / roster lines).
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS game_party_events (
+      dedupe_key TEXT PRIMARY KEY,
+      observer TEXT NOT NULL,
+      server_name TEXT,
+      kind TEXT NOT NULL,
+      name TEXT NOT NULL,
+      at TEXT NOT NULL,
+      party_ref TEXT,
+      level INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_game_party_at ON game_party_events(at);
+  `);
+  // Social files read before party events were parsed never had them stored: re-read them once.
+  // The scan sets the flag after it has stored party events with the new parser.
+  if (getSetting(db, PARTY_EVENTS_BACKFILL) !== "1") invalidateSocialFiles(db);
 
   const lootColumns = db.prepare("PRAGMA table_info(loot_entries)").all() as Array<{ name: string }>;
   if (!lootColumns.some((column) => column.name === "group_id")) {
@@ -426,6 +444,40 @@ export function ingestLoot(db: DatabaseSync, events: ParsedLoot[]): IngestResult
     throw error;
   }
   return result;
+}
+
+export const PARTY_EVENTS_BACKFILL = "party_events_backfill_v2";
+
+export function ingestPartyEvents(db: DatabaseSync, events: ParsedPartyEvent[]): number {
+  setSetting(db, PARTY_EVENTS_BACKFILL, "1");
+  if (events.length === 0) return 0;
+  const insert = db.prepare(
+    `INSERT INTO game_party_events (dedupe_key, observer, server_name, kind, name, at, party_ref, level)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(dedupe_key) DO NOTHING`,
+  );
+  let added = 0;
+  db.exec("BEGIN");
+  try {
+    for (const event of events) {
+      const info = insert.run(
+        event.dedupeKey,
+        event.observer,
+        event.serverName,
+        event.kind,
+        event.name,
+        event.at,
+        event.partyRef,
+        event.level,
+      );
+      added += Number(info.changes);
+    }
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+  return added;
 }
 
 export function ingestSales(db: DatabaseSync, events: ParsedSale[]): IngestResult {

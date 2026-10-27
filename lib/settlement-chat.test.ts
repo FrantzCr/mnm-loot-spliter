@@ -65,7 +65,7 @@ describe("settlement-chat", () => {
     assert.equal(messages.length, 1);
     assert.ok(
       messages[0].startsWith(
-        "MnM Loot Splitter — equitable loot split (vendor prices), tip whom: ",
+        "MnM Loot Splitter — equitable loot split (rounded to 1s, based on vendor prices), tip whom: ",
       ),
     );
     assert.ok(messages[0].includes("Alice>Bob 5s"));
@@ -84,6 +84,7 @@ describe("settlement-chat", () => {
       { roundCopper: 1 },
     );
     assert.equal(messages.length, 1);
+    assert.ok(messages[0].includes("(exact, based on vendor prices)"));
     assert.ok(messages[0].includes("Alice>Bob 40c"));
     assert.ok(messages[0].includes("Carol>Dave 10c"));
   });
@@ -110,7 +111,7 @@ describe("settlement-chat", () => {
       assert.ok(!message.includes("\n"));
       assert.ok(
         message.startsWith(
-          `MnM Loot Splitter — equitable split (vendor prices) (${index + 1}/${messages.length}):`,
+          `MnM Loot Splitter — equitable split (rounded to 1s, based on vendor prices) (${index + 1}/${messages.length}):`,
         ),
       );
     }

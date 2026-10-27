@@ -20,8 +20,12 @@ export const CHAT_ROUND_PRESETS = [
   { copper: 1, labelKey: "1c" as const },
   { copper: 5, labelKey: "5c" as const },
   { copper: 10, labelKey: "10c" as const },
+  { copper: 50, labelKey: "50c" as const },
   { copper: COPPER_PER_SILVER, labelKey: "1s" as const },
+  { copper: 2 * COPPER_PER_SILVER, labelKey: "2s" as const },
   { copper: 5 * COPPER_PER_SILVER, labelKey: "5s" as const },
+  { copper: 10 * COPPER_PER_SILVER, labelKey: "10s" as const },
+  { copper: 50 * COPPER_PER_SILVER, labelKey: "50s" as const },
   { copper: COPPER_PER_GOLD, labelKey: "1g" as const },
 ] as const;
 
@@ -132,6 +136,12 @@ export function formatCoinsChat(copper: number, step: number = CHAT_COPPER_STEP)
   return amount < 0 ? `-${body}` : body;
 }
 
+/** Rounding phrase inside the announce: "exact" at 1c, else "rounded to 10c" (UI makes it clickable). */
+export function chatRoundToken(step: number): string {
+  const unit = normalizeChatRoundStep(step);
+  return unit === 1 ? "exact" : `rounded to ${formatChatRoundLabel(unit)}`;
+}
+
 /** When every tip rounds to zero, announce that the split is already fair. */
 export const EQUITABLE_CHAT_ANNOUNCE =
   `${APP_CHAT_NAME} — equitable loot split (vendor prices): everyone is even, no tips needed.`;
@@ -173,13 +183,16 @@ export function buildSettlementChatMessages(
   const segments = rounded.map((transfer) => formatTransferChat(transfer, step));
   const sep = " | ";
 
-  const singleIntro = `${APP_CHAT_NAME} — equitable loot split (vendor prices), tip whom: `;
+  // Tell the group how amounts were rounded: "exact" at 1c, else the step ("rounded to 10c").
+  // Rounding first, so it reads as the tips being rounded — not the vendor prices.
+  const note = `${chatRoundToken(step)}, based on vendor prices`;
+  const singleIntro = `${APP_CHAT_NAME} — equitable loot split (${note}), tip whom: `;
   const singleBody = segments.join(sep);
   if (singleIntro.length + singleBody.length <= maxLen) {
     return [singleIntro + singleBody];
   }
 
-  const partIntroLen = `${APP_CHAT_NAME} — equitable split (vendor prices) (99/99): `.length;
+  const partIntroLen = `${APP_CHAT_NAME} — equitable split (${note}) (99/99): `.length;
   const budget = Math.max(24, maxLen - partIntroLen);
   const bodies: string[] = [];
   let current = "";
@@ -202,6 +215,6 @@ export function buildSettlementChatMessages(
   const total = bodies.length;
   return bodies.map(
     (body, index) =>
-      `${APP_CHAT_NAME} — equitable split (vendor prices) (${index + 1}/${total}): ${body}`,
+      `${APP_CHAT_NAME} — equitable split (${note}) (${index + 1}/${total}): ${body}`,
   );
 }
