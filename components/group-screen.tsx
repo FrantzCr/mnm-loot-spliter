@@ -53,6 +53,8 @@ import {
   writeStoredChatRoundStep,
 } from "@/lib/settlement-chat";
 import { ChatRoundPicker } from "@/components/chat-round-toggle";
+import { GroupBar } from "@/components/group-switcher";
+import type { PartySummary } from "@/lib/group";
 import { cn } from "cn";
 import {
   stackLootLines,
@@ -73,13 +75,17 @@ type PartyPresence = {
 type PartyView = {
   party: null | {
     id: string;
+    name: string | null;
+    status: "open" | "closed";
     startedAt: string;
+    closedAt: string | null;
     mode: SplitMode | null;
     presences: PartyPresence[];
   };
   people: Array<{ id: string; name: string; serverName: string | null }>;
   lines: PotLine[];
   split: SplitComputation | null;
+  parties: PartySummary[];
 };
 
 type DraftGuest = { key: string; name: string; personId?: string | null };
@@ -201,6 +207,9 @@ export function GroupScreen() {
   const [lootPersonId, setLootPersonId] = useState<string | null>(null);
   const [membersOpen, setMembersOpen] = useState(true);
   const [screenTab, setScreenTab] = useState<GroupScreenTab>("overview");
+  /** Closed group opened read-only from the switcher (null = live view of the active group). */
+  const [archiveId, setArchiveId] = useState<string | null>(null);
+  const [archiveView, setArchiveView] = useState<PartyView | null>(null);
   const [potOpen, setPotOpen] = useState(true);
   const [pendingOpen, setPendingOpen] = useState(true);
 
@@ -676,6 +685,39 @@ export function GroupScreen() {
     setCloseOpen(false);
   }
 
+  async function showParty(partyId: string | null) {
+    setError(null);
+    setArchiveId(partyId);
+    setArchiveView(null);
+    if (!partyId) return;
+    try {
+      const next = await api<PartyView>(`/api/group?id=${encodeURIComponent(partyId)}`);
+      setArchiveView(next);
+    } catch (caught) {
+      setArchiveId(null);
+      setError(explain(caught, ErrorCode.groupLoadFailed));
+    }
+  }
+
+  async function renameGroup(partyId: string, name: string): Promise<boolean> {
+    setSaving(true);
+    setError(null);
+    try {
+      const next = await api<PartyView>("/api/group", {
+        method: "PATCH",
+        body: JSON.stringify({ id: partyId, name }),
+      });
+      if (next.party?.status === "closed") setArchiveView(next);
+      await load();
+      return true;
+    } catch (caught) {
+      setError(explain(caught, ErrorCode.groupRenameFailed));
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function closeGroup() {
     setSaving(true);
     setError(null);
@@ -757,6 +799,25 @@ export function GroupScreen() {
 
       {loading ? <p className="text-sm text-muted-foreground">{copy.group.loading}</p> : null}
 
+      {view ? (
+        <GroupBar
+          parties={view.parties}
+          shownId={archiveId ?? party?.id ?? null}
+          archived={archiveId != null}
+          saving={saving}
+          onShow={(partyId) => void showParty(partyId)}
+          onRename={renameGroup}
+        />
+      ) : null}
+
+      {archiveId ? (
+        archiveView ? (
+          <ArchivedGroup view={archiveView} onBack={() => void showParty(null)} />
+        ) : (
+          <p className="text-sm text-muted-foreground">{copy.group.loading}</p>
+        )
+      ) : (
+      <>
       <div
         role="tablist"
         aria-label={copy.group.screenTabs}
@@ -1586,11 +1647,69 @@ export function GroupScreen() {
       </Card>
       ) : null}
       </div>
+      </>
+      )}
     </div>
   );
 }
 
 type GroupScreenTab = "overview" | "loot" | "sell";
+
+/** Closed group, read-only: who held what and the last split proposal. */
+function ArchivedGroup({ view, onBack }: { view: PartyView; onBack: () => void }) {
+  const { copy, stamp } = useI18n();
+  const party = view.party;
+  if (!party) return null;
+  const stacked = stackLootLinesAcrossPeople(view.lines);
+  return (
+    <div className="grid gap-4">
+      <Alert>
+        <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+          <span>
+            {copy.group.archivedNotice(stamp(party.startedAt), party.closedAt ? stamp(party.closedAt) : "—")}
+          </span>
+          <Button type="button" variant="outline" size="sm" onClick={onBack}>
+            {copy.group.backToActive}
+          </Button>
+        </AlertDescription>
+      </Alert>
+
+      {view.split ? (
+        <SplitResult split={view.split} lines={view.lines} saving={false} readOnly onMode={() => {}} onSettleEveryone={() => {}} />
+      ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle as="h3">{copy.group.pot}</CardTitle>
+          <CardDescription>
+            {party.presences.map((presence) => presence.name).join(", ")} · {copy.group.lootSummary(view.lines.length)}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {stacked.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{copy.group.potEmpty}</p>
+          ) : (
+            <ul className="scrollbar-theme grid max-h-96 gap-2 overflow-auto text-sm">
+              {stacked.map((line) => (
+                <li key={`archive-${line.id}`} className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
+                  <span className="min-w-0">
+                    {lootLineLabel(line.itemName, copy)}
+                    {line.quantity > 1 ? ` × ${line.quantity}` : ""}
+                    <span className="text-muted-foreground">
+                      {" · "}
+                      <LootHolderNames line={line} />
+                    </span>
+                  </span>
+                  <LootLinePriceDisplay line={line} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 function SplitResult({
   split,
@@ -1598,12 +1717,15 @@ function SplitResult({
   saving,
   onMode,
   onSettleEveryone,
+  readOnly = false,
 }: {
   split: SplitComputation;
   lines: PotLine[];
   saving: boolean;
   onMode: (mode: SplitMode) => void;
   onSettleEveryone: () => void;
+  /** Archived group: no mode switch, no settle actions (copy/share stays available). */
+  readOnly?: boolean;
 }) {
   const { copy } = useI18n();
   const [splitOpen, setSplitOpen] = useState(true);
@@ -1695,8 +1817,8 @@ function SplitResult({
   }
 
   useEffect(() => {
-    if (split.mode === "items") ensureValueMode();
-  }, [split.mode]);
+    if (split.mode === "items" && !readOnly) ensureValueMode();
+  }, [split.mode, readOnly]);
 
   useEffect(() => {
     clearCopyFeedbackTimers();
@@ -1852,7 +1974,7 @@ function SplitResult({
               </p>
             ) : null}
 
-            {transfers.length > 0 ? (
+            {transfers.length > 0 && !readOnly ? (
               <div className="border-t border-[#6e5338]/40 pt-3">
                 <Button type="button" disabled={saving || split.mode !== "value"} onClick={onSettleEveryone}>
                   {copy.group.settleEveryone}

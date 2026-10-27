@@ -10,7 +10,7 @@ import { unitPriceFromSale } from "./sale-price";
 
 const globalForDb = globalThis as unknown as { registreDb?: DatabaseSync; registreSchema?: number };
 
-const SCHEMA = 8;
+const SCHEMA = 9;
 
 const APP_DATA_DIR = "mnm-loot-spliter";
 const LEGACY_APP_DATA_DIRS = ["loot-spliter"] as const;
@@ -222,6 +222,14 @@ function migrate(db: DatabaseSync) {
   }
   if (!partyColumns.some((column) => column.name === "pot_started_at")) {
     db.exec("ALTER TABLE parties ADD COLUMN pot_started_at TEXT");
+  }
+  // Multi-group: user-editable name; closed groups stay readable as archives.
+  if (!partyColumns.some((column) => column.name === "name")) {
+    db.exec("ALTER TABLE parties ADD COLUMN name TEXT");
+  }
+  if (!partyColumns.some((column) => column.name === "closed_at")) {
+    db.exec("ALTER TABLE parties ADD COLUMN closed_at TEXT");
+    db.exec("UPDATE parties SET closed_at = updated_at WHERE status = 'closed'");
   }
   const lootEpochColumns = db.prepare("PRAGMA table_info(loot_entries)").all() as Array<{ name: string }>;
   if (!lootEpochColumns.some((column) => column.name === "group_epoch")) {

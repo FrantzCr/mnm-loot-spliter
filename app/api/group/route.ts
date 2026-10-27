@@ -1,14 +1,15 @@
 import { ErrorCode } from "@/lib/codes";
 import { getDb } from "@/lib/db";
-import { readParty, resetPot, startParty, type PartyMemberInput } from "@/lib/group";
+import { readParty, renameParty, resetPot, startParty, type PartyMemberInput } from "@/lib/group";
 import { jsonError, readJson, routeError } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    return Response.json(readParty());
+    const id = new URL(request.url).searchParams.get("id");
+    return Response.json(readParty(getDb(), id && id.length > 0 ? id : null));
   } catch (error) {
     return routeError(error);
   }
@@ -21,7 +22,8 @@ export async function POST(request: Request) {
     if (members.length === 0) {
       return jsonError(ErrorCode.groupNeedMembers, 400);
     }
-    return Response.json(startParty(getDb(), members));
+    const name = typeof body.name === "string" ? body.name : null;
+    return Response.json(startParty(getDb(), members, name));
   } catch (error) {
     return routeError(error);
   }
@@ -36,6 +38,16 @@ function memberInput(value: unknown): PartyMemberInput[] {
       label: typeof record.label === "string" ? record.label : null,
     },
   ];
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const body = await readJson(request);
+    if (typeof body.id !== "string" || body.id.length === 0) return jsonError(ErrorCode.groupMissing, 400);
+    return Response.json(renameParty(body.id, body.name));
+  } catch (error) {
+    return routeError(error);
+  }
 }
 
 export async function DELETE() {

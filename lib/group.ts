@@ -26,21 +26,44 @@ export type PartyPresence = {
   settledAt: string | null;
 };
 
+export type PartyStatus = "open" | "closed";
+
+/** Row for the group switcher (active + archived). */
+export type PartySummary = {
+  id: string;
+  name: string | null;
+  status: PartyStatus;
+  startedAt: string;
+  closedAt: string | null;
+  lootCount: number;
+};
+
 export type PartyView = {
   party: null | {
     id: string;
+    name: string | null;
+    status: PartyStatus;
     startedAt: string;
+    closedAt: string | null;
     mode: SplitMode | null;
     presences: PartyPresence[];
   };
   people: Array<{ id: string; name: string; serverName: string | null }>;
   lines: PotLine[];
   split: SplitComputation | null;
+  /** Every group, active first then newest archives. */
+  parties: PartySummary[];
 };
+
+const MAX_PARTY_NAME = 60;
 
 export type PartyMemberInput = { personId?: string | null; label?: string | null };
 
-export function startParty(db: DatabaseSync = getDb(), members: PartyMemberInput[] = []): PartyView {
+export function startParty(
+  db: DatabaseSync = getDb(),
+  members: PartyMemberInput[] = [],
+  name: string | null = null,
+): PartyView {
   const open = db.prepare("SELECT id FROM parties WHERE status = 'open'").get() as { id: string } | undefined;
   if (open) throw new Error(ErrorCode.groupAlreadyOpen);
   // One timestamp for the party and every draft seat — fair shares stay equal from open.
@@ -49,9 +72,9 @@ export function startParty(db: DatabaseSync = getDb(), members: PartyMemberInput
   db.exec("BEGIN");
   try {
     db.prepare(
-      `INSERT INTO parties (id, started_at, status, headcount, mode, updated_at)
-       VALUES (?, ?, 'open', NULL, NULL, ?)`,
-    ).run(partyId, startedAt, startedAt);
+      `INSERT INTO parties (id, started_at, status, headcount, mode, updated_at, name)
+       VALUES (?, ?, 'open', NULL, NULL, ?, ?)`,
+    ).run(partyId, startedAt, startedAt, cleanText(name, MAX_PARTY_NAME));
     for (const member of members) addPresence(db, partyId, member, startedAt);
     db.exec("COMMIT");
   } catch (error) {
@@ -92,7 +115,7 @@ export function closeParty(db: DatabaseSync = getDb()): PartyView {
   db.exec("BEGIN");
   try {
     enqueueGroupResale(open.id, db);
-    db.prepare("UPDATE parties SET status = 'closed', updated_at = ? WHERE id = ?").run(now, open.id);
+    db.prepare("UPDATE parties SET status = 'closed', closed_at = ?, updated_at = ? WHERE id = ?").run(now, now, open.id);
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");
@@ -100,6 +123,48 @@ export function closeParty(db: DatabaseSync = getDb()): PartyView {
   }
   invalidateSocialFiles(db);
   return readParty(db);
+}
+
+/** Rename any group (active or archived). Empty name falls back to the date label. */
+export function renameParty(partyId: string, name: unknown, db: DatabaseSync = getDb()): PartyView {
+  const row = db.prepare("SELECT id, status FROM parties WHERE id = ?").get(partyId) as
+    | { id: string; status: string }
+    | undefined;
+  if (!row) throw new Error(ErrorCode.groupMissing);
+  db.prepare("UPDATE parties SET name = ?, updated_at = ? WHERE id = ?").run(
+    cleanText(name, MAX_PARTY_NAME),
+    new Date().toISOString(),
+    partyId,
+  );
+  return readParty(db, row.status === "open" ? null : partyId);
+}
+
+export function listParties(db: DatabaseSync = getDb()): PartySummary[] {
+  const rows = db
+    .prepare(
+      `SELECT p.id, p.name, p.status, p.started_at, p.closed_at,
+              (SELECT COUNT(*) FROM loot_entries l
+                WHERE l.group_id = p.id AND l.group_epoch = p.session_epoch) AS loot_count
+       FROM parties p
+       ORDER BY CASE WHEN p.status = 'open' THEN 0 ELSE 1 END,
+                COALESCE(p.closed_at, p.started_at) DESC`,
+    )
+    .all() as Array<{
+    id: string;
+    name: string | null;
+    status: string;
+    started_at: string;
+    closed_at: string | null;
+    loot_count: number | bigint;
+  }>;
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    status: row.status === "open" ? "open" : "closed",
+    startedAt: row.started_at,
+    closedAt: row.closed_at,
+    lootCount: asNumber(row.loot_count),
+  }));
 }
 
 export function setPartyMode(mode: SplitMode, db: DatabaseSync = getDb()): PartyView {
@@ -250,7 +315,11 @@ function presenceRow(db: DatabaseSync, partyId: string, presenceId: string): { i
   return presence;
 }
 
-export function readParty(db: DatabaseSync = getDb()): PartyView {
+/**
+ * Read the active group, or — with `partyId` — any group including closed archives. Archives are
+ * read-only because every mutation still targets the open party only.
+ */
+export function readParty(db: DatabaseSync = getDb(), partyId: string | null = null): PartyView {
   syncCharactersFromWatch(db);
   const people = (
     db.prepare("SELECT id, name, server_name FROM people WHERE on_machine = 1 ORDER BY name COLLATE NOCASE").all() as Array<{
@@ -260,10 +329,27 @@ export function readParty(db: DatabaseSync = getDb()): PartyView {
     }>
   ).map((row) => ({ id: row.id, name: row.name, serverName: row.server_name }));
 
-  const party = db
-    .prepare("SELECT id, started_at, mode, session_epoch FROM parties WHERE status = 'open'")
-    .get() as { id: string; started_at: string; mode: string | null; session_epoch: number | bigint } | undefined;
-  if (!party) return { party: null, people, lines: [], split: null };
+  const parties = listParties(db);
+  const partyColumns = "id, started_at, mode, session_epoch, name, status, closed_at";
+  const party = (
+    partyId
+      ? db.prepare(`SELECT ${partyColumns} FROM parties WHERE id = ?`).get(partyId)
+      : db.prepare(`SELECT ${partyColumns} FROM parties WHERE status = 'open'`).get()
+  ) as
+    | {
+        id: string;
+        started_at: string;
+        mode: string | null;
+        session_epoch: number | bigint;
+        name: string | null;
+        status: string;
+        closed_at: string | null;
+      }
+    | undefined;
+  if (!party) {
+    if (partyId) throw new Error(ErrorCode.groupMissing);
+    return { party: null, people, lines: [], split: null, parties };
+  }
 
   const presences = (
     db
@@ -353,9 +439,18 @@ export function readParty(db: DatabaseSync = getDb()): PartyView {
   }));
 
   return {
-    party: { id: party.id, startedAt: party.started_at, mode: party.mode === mode ? mode : null, presences },
+    party: {
+      id: party.id,
+      name: party.name,
+      status: party.status === "open" ? "open" : "closed",
+      startedAt: party.started_at,
+      closedAt: party.closed_at,
+      mode: party.mode === mode ? mode : null,
+      presences,
+    },
     people,
     lines,
     split: splitPot(lines, windows, mode, settlements),
+    parties,
   };
 }

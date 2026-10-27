@@ -12,6 +12,8 @@ export const ErrorCode = {
   groupStartBeforeSettle: "group.startBeforeSettle",
   groupAlreadySettled: "group.alreadySettled",
   groupStartBeforeClose: "group.startBeforeClose",
+  groupMissing: "group.missing",
+  groupRenameFailed: "group.renameFailed",
   presenceMissing: "presence.missing",
   pendingMissing: "pending.missing",
   watchNeedPath: "watch.needPath",

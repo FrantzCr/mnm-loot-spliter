@@ -42,9 +42,9 @@
 
 | ID | Item | Status |
 |----|------|--------|
-| D1 | `parties.name` (user-editable) | pending |
-| D2 | Statuses: `active` \| `closed` (archived view). One `active` max. Closed keeps loot + last split proposal readable | pending |
-| D3 | “New group” while another is closed/archived; switcher to reopen archived views | pending |
+| D1 | `parties.name` (user-editable) | done |
+| D2 | Statuses: `active` \| `closed` (archived view). One `active` max. Closed keeps loot + last split proposal readable | done |
+| D3 | “New group” while another is closed/archived; switcher to reopen archived views | done |
 
 ### E — Group visual refonte
 
@@ -90,4 +90,7 @@
 - **2026-10-27** — B3: schema 8 — `parties.session_epoch`, `parties.pot_started_at`, `loot_entries.group_epoch`, `party_settlements.session_epoch`. `resetPot` replaces `resetParty` (DELETE /api/group): bumps epoch, clears settled_at, keeps presences. Loot looted before `pot_started_at` but read late lands in the previous (hidden) epoch. Close→resale only enqueues current-epoch loot. Test: `lib/reset-pot.test.ts`.
 - **2026-10-27** — A+B committed (`d66fcf4`).
 - **2026-10-27** — C1/C2: page-level tabs in `group-screen` (Overview = roster + split; Loot = pot with unpriced list always on top; To sell = pending resale). Tab badges: unpriced count on Loot, pending count on To sell. Overview shows a one-line unpriced hint (with a jump to Loot) only while tips are still open; the duplicate unpriced line in the members summary was removed.
-- **Next:** D (parties.name, active/closed archive, switcher), then E (visual).
+- **2026-10-27** — C committed (`46f6e1e`).
+- **2026-10-27** — D1–D3: schema 9 — `parties.name` (≤60 chars, null = "Group of <date>" label) and `parties.closed_at` (backfilled from `updated_at` for old closed rows). Status values stay `open` | `closed` in DB ("active" in UI). `readParty(db, partyId?)` reads archives; `PartyView.parties` lists all groups for the switcher; `renameParty` + `PATCH /api/group {id, name}`; `GET /api/group?id=`. UI: `components/group-switcher.tsx` (`GroupBar`: name + inline rename + "Show" select of active/closed) and `ArchivedGroup` in `group-screen` (read-only split via `SplitResult readOnly`, stacked loot). Mutations still only hit the open party. Test: `lib/multi-group.test.ts`.
+- **Not done in D:** naming a group at start (start form has no name field; rename right after works).
+- **Next:** E (left rail with fair-share bars, +/− colors, hold-vs-share diagram, bigger recap cards).
