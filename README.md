@@ -132,10 +132,25 @@ Needs `gh` authenticated (`gh auth login`). End users of the installed app do **
    remain.
 3. Use **Group** to start a party, track who holds what at known resale value,
    and see who should pay whom to even out (**value split**).
-4. Maintain a **resale price book** (manual prices, your own vendor sales, or
-   **Fill gaps from MnMdb** on the prices page — community vendor observations
-   from [mnm-db.com](https://mnm-db.com) / mnm-tools; never overwrites local prices).
+4. Maintain a **resale price book** (manual prices, your own vendor sales,
+   **Fill gaps from the shared price book** — see below — or **Fill gaps from MnMdb**
+   on the prices page — community vendor observations from
+   [mnm-db.com](https://mnm-db.com) / mnm-tools; neither ever overwrites local prices).
    Export / import JSON (or another copy’s price book) when useful.
+
+### Shared price book
+
+[`shared/price-book.json`](shared/price-book.json) is an export of the author’s own
+price book (about 400 items), kept in this repository. On the **Resale prices** page,
+**Fill gaps from the shared price book** downloads it from GitHub and:
+
+- adds a price only for items you have **no price for yet** — your prices, and loot
+  lines you edited by hand, are never changed;
+- writes it straight to your book (nothing to approve under *needs a decision*);
+- prices the loot you already have for those items right away.
+
+The app always reads the latest version of the file, so it can be updated without a
+new release. Anyone can also download it and use **Import** on the prices page.
 5. After a group closes, **Waiting to sell** and **Recent players** help with
    leftover vendor stock and inviting people back.
 
@@ -217,7 +232,7 @@ you click.
 | You see | Try this |
 | --- | --- |
 | No loot shows up | Check the folder in **Options** points at the game folder or a `Ledger` folder, and keep the app open while you play: the game deletes its Ledger files when it closes. |
-| An item counts for nothing | It has no resale price yet. Set one on the prices page, or use **Fill gaps from MnMdb**. The price applies to past loot too. |
+| An item counts for nothing | It has no resale price yet. Set one on the prices page, or use **Fill gaps from the shared price book** or **Fill gaps from MnMdb**. The price applies to past loot too. |
 | Someone's share looks wrong | Check when they joined and left (shown under their name). Loot only counts for people present at that moment. |
 | A member is missing from the list | They left and have nothing to settle, so they are hidden; their share is still counted. |
 | The pot from earlier is gone | It was reset. Pick it under *Previous pots* in the **Show** menu. |
@@ -237,6 +252,7 @@ check those first.
 - **Reset pot & history** — start a fresh pot with the same people; past pots and closed groups stay readable
 - **In-game party follow-up** — offers to add or remove members as the game's party changes
 - **Price book** — unit prices you enter; apply to past and future loot of that item
+- **Shared price book** — fill missing prices from the author’s price book on GitHub
 - **Pending sell** — items from closed groups waiting for a vendor sale (or dismiss)
 - **Recent players** — people from recently closed groups, for quick re-add
 - **EN / FR / ES** — switch language in the app
@@ -272,6 +288,11 @@ npm run tauri:dev
 
 SQLite path is the same in browser/dev and packaged builds:
 `%LOCALAPPDATA%\mnm-loot-spliter\`. Nothing is prefilled.
+
+**Refreshing the shared price book:** on the prices page, **Export** your price book,
+replace [`shared/price-book.json`](shared/price-book.json) with it, then commit and
+push to `main`. No release needed — the app fetches the file from `main`. (Keep it in
+`shared/`: `data/` is git-ignored because the dev database can live there.)
 
 ---
 
