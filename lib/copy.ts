@@ -221,6 +221,8 @@ const en = {
     copyChatAnnounceDone: "Copied — paste in group chat (English, one line).",
     copyChatAnnounceNext: (part: number, total: number) =>
       `Copied ${part}/${total} — click again for the next line.`,
+    // Mirrors the game client (English) party line; display only, never copied.
+    chatPartyPrefix: "You tell your party, ",
     copySplitCommand: "Copy /split",
     copySplitCommandDone: "Copied — paste /split in game chat.",
     nothingToPay: "Everyone is even — nothing to pay.",
@@ -652,6 +654,8 @@ const fr: Copy = {
     copyChatAnnounce: "Copier l’annonce",
     copyChatAnnounceDone: "Copié — colle dans le chat de groupe (anglais, une ligne).",
     copyChatAnnounceNext: (part, total) => `Copié ${part}/${total} — reclique pour la ligne suivante.`,
+    // Mirrors the game client (English) party line; display only, never copied.
+    chatPartyPrefix: "You tell your party, ",
     copySplitCommand: "Copier le /split",
     copySplitCommandDone: "Copié — colle /split dans le chat du jeu.",
     nothingToPay: "Tout le monde est à égalité — rien à se verser.",
@@ -1084,6 +1088,8 @@ const es: Copy = {
     copyChatAnnounce: "Copiar anuncio",
     copyChatAnnounceDone: "Copiado — pégalo en el chat de grupo (inglés, una línea).",
     copyChatAnnounceNext: (part, total) => `Copiado ${part}/${total} — pulsa otra vez para la siguiente.`,
+    // Mirrors the game client (English) party line; display only, never copied.
+    chatPartyPrefix: "You tell your party, ",
     copySplitCommand: "Copiar el /split",
     copySplitCommandDone: "Copiado — pega /split en el chat del juego.",
     nothingToPay: "Todos están iguales — nada que pagarse.",

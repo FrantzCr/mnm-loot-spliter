@@ -167,8 +167,9 @@ export function ChatAnnounceWithRound({
         title={label}
         onClick={() => setOpen((current) => !current)}
         className={cn(
-          "inline-flex items-center gap-0.5 rounded-sm border border-dashed border-[#6e5338]/60 bg-[#efe6d6]/70 px-1 leading-snug text-foreground transition-colors hover:border-solid hover:bg-[#efe6d6]",
-          open && "border-solid bg-[#efe6d6]",
+          // Sits on the black chat preview: inherit the channel colour.
+          "inline-flex items-center gap-0.5 rounded-sm border border-dashed border-current/60 px-1 leading-snug transition-colors hover:border-solid hover:bg-white/10",
+          open && "border-solid bg-white/10",
         )}
       >
         {token}
@@ -178,7 +179,7 @@ export function ChatAnnounceWithRound({
         <span
           role="dialog"
           aria-label={label}
-          className="absolute top-full left-0 z-30 mt-1 grid w-[17rem] gap-2 rounded-sm border border-[#6e5338]/55 bg-card p-2.5 font-body shadow-md"
+          className="absolute top-full left-0 z-30 mt-1 grid w-[17rem] gap-2 rounded-sm border border-[#6e5338]/55 bg-card p-2.5 font-body text-foreground shadow-md"
         >
           <span className="text-xs text-muted-foreground">{label}</span>
           <ChatRoundPicker
@@ -201,7 +202,7 @@ export function ChatAnnounceWithRound({
   if (at < 0) {
     return (
       <>
-        {message} <span className="text-muted-foreground">·</span> {chip}
+        {message} <span className="opacity-60">·</span> {chip}
       </>
     );
   }

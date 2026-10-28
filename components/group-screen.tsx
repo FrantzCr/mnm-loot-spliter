@@ -1878,9 +1878,12 @@ function SplitResult({
                   </button>
                 ))}
               </div>
-              <div className="min-h-16 rounded-sm border border-[#6e5338]/35 bg-card px-3 py-2.5 font-mono text-sm leading-relaxed break-words text-foreground">
+              {/* Preview styled like the game's chat window: black, party channel in cyan. */}
+              <div className="min-h-16 rounded-sm bg-black px-3 py-2.5 font-body text-[0.9375rem] leading-relaxed break-words text-[#2fd3d3]">
                 {shareTab === "chat" ? (
-                  // Rounding is set from the chip inside the announce itself.
+                  // Rounding is set from the chip inside the announce itself; the party prefix is display only.
+                  <>
+                  {copy.group.chatPartyPrefix}&quot;
                   <ChatAnnounceWithRound
                     message={chatMessages[chatPart % chatMessages.length] ?? ""}
                     value={roundCopper}
@@ -1890,8 +1893,10 @@ function SplitResult({
                     customPlaceholder={copy.group.chatRoundCustomPlaceholder}
                     customApply={copy.group.chatRoundCustomApply}
                   />
+                  &quot;
+                  </>
                 ) : (
-                  gameSplitCommand
+                  <span className="text-[#f2f2f2]">{gameSplitCommand}</span>
                 )}
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2">
