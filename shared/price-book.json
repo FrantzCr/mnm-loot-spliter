@@ -1,0 +1,1607 @@
+{
+  "format": "mnm-loot-spliter-prices",
+  "version": 1,
+  "exportedAt": "2026-10-28T20:55:05.720Z",
+  "prices": [
+    {
+      "itemName": "Alunite Ore",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Antique Billon Coin",
+      "unitCopper": 500
+    },
+    {
+      "itemName": "Antique Ceramic Fragment",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Ashira Tail",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Ashira Tooth",
+      "unitCopper": 17
+    },
+    {
+      "itemName": "Ashira Warrior Pelt",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Basa",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Bat Eye",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Bat Fur",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Bat Tooth",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Bat Wing",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Bell Pepper",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Blind Deepweb Eye",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Bone Ash",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Bone Chips",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Brittle Stone",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Bronze Chain Mask",
+      "unitCopper": 105
+    },
+    {
+      "itemName": "Bronze Dagger",
+      "unitCopper": 252
+    },
+    {
+      "itemName": "Bronze Longsword",
+      "unitCopper": 263
+    },
+    {
+      "itemName": "Bronze Mace",
+      "unitCopper": 255
+    },
+    {
+      "itemName": "Bronze Scraps",
+      "unitCopper": 4
+    },
+    {
+      "itemName": "Bronze Stirrups",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Bronze Tread",
+      "unitCopper": 4
+    },
+    {
+      "itemName": "Bronze War Lance",
+      "unitCopper": 318
+    },
+    {
+      "itemName": "Cabbage",
+      "unitCopper": 3
+    },
+    {
+      "itemName": "Carrot",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Cataclysm",
+      "unitCopper": 10
+    },
+    {
+      "itemName": "Celery",
+      "unitCopper": 3
+    },
+    {
+      "itemName": "Cheese",
+      "unitCopper": 4
+    },
+    {
+      "itemName": "Chipped Amber",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Chipped Black Pearl",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Chipped Black Sapphire",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Chipped Blue Diamond",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Chipped Carnelian",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Chipped Cat's Eye Agate",
+      "unitCopper": 18
+    },
+    {
+      "itemName": "Chipped Diamond",
+      "unitCopper": 8
+    },
+    {
+      "itemName": "Chipped Emerald",
+      "unitCopper": 4
+    },
+    {
+      "itemName": "Chipped Fire Emerald",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Chipped Fire Opal",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Chipped Hematite",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Chipped Jacinth",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Chipped Jasper",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Chipped Lapis Lazuli",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Chipped Malachite",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Chipped Onyx",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Chipped Peridot",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Chipped Ruby",
+      "unitCopper": 7
+    },
+    {
+      "itemName": "Chipped Sapphire",
+      "unitCopper": 8
+    },
+    {
+      "itemName": "Chipped Star Rose Quartz",
+      "unitCopper": 4
+    },
+    {
+      "itemName": "Chipped Star Ruby",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Chipped Topaz",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Chipped Turquoise",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Chipped Wolf's Eye Agate",
+      "unitCopper": 4
+    },
+    {
+      "itemName": "Cinder Beetle Carapace",
+      "unitCopper": 15
+    },
+    {
+      "itemName": "Cinder Beetle Eye",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Cinder Beetle Gland",
+      "unitCopper": 25
+    },
+    {
+      "itemName": "Cinder Beetle Legs",
+      "unitCopper": 7
+    },
+    {
+      "itemName": "Clawed Spider Legs",
+      "unitCopper": 12
+    },
+    {
+      "itemName": "Cloth Bandage",
+      "unitCopper": 4
+    },
+    {
+      "itemName": "Cloth Scraps",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Coal",
+      "unitCopper": 7
+    },
+    {
+      "itemName": "Cooked Ashira Meat",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Cooked Bat Meat",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Cooked Beetle Meat",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Cooked Deep Beetle Meat",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Cooked Deep Gnome Meat",
+      "unitCopper": 12
+    },
+    {
+      "itemName": "Cooked Goblin Meat",
+      "unitCopper": 12
+    },
+    {
+      "itemName": "Cooked Human Meat",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Cooked Rat Meat",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Cooked Snake Meat",
+      "unitCopper": 4
+    },
+    {
+      "itemName": "Copper Chain Mask",
+      "unitCopper": 54
+    },
+    {
+      "itemName": "Copper Chain Waistguard",
+      "unitCopper": 51
+    },
+    {
+      "itemName": "Copper Chain Wristguard",
+      "unitCopper": 50
+    },
+    {
+      "itemName": "Copper Dagger",
+      "unitCopper": 47
+    },
+    {
+      "itemName": "Copper Greatsword",
+      "unitCopper": 61
+    },
+    {
+      "itemName": "Copper Longsword",
+      "unitCopper": 45
+    },
+    {
+      "itemName": "Copper Maul",
+      "unitCopper": 61
+    },
+    {
+      "itemName": "Copper Ore",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Copper Scraps",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Copper Stirrups",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Copper Tread",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Copper War Lance",
+      "unitCopper": 56
+    },
+    {
+      "itemName": "Corroded Bronze Axe",
+      "unitCopper": 125
+    },
+    {
+      "itemName": "Corroded Bronze Battle Axe",
+      "unitCopper": 150
+    },
+    {
+      "itemName": "Corroded Bronze Chain Boots",
+      "unitCopper": 126
+    },
+    {
+      "itemName": "Corroded Bronze Chain Cloak",
+      "unitCopper": 131
+    },
+    {
+      "itemName": "Corroded Bronze Chain Coif",
+      "unitCopper": 134
+    },
+    {
+      "itemName": "Corroded Bronze Chain Gambeson",
+      "unitCopper": 131
+    },
+    {
+      "itemName": "Corroded Bronze Chain Gloves",
+      "unitCopper": 132
+    },
+    {
+      "itemName": "Corroded Bronze Chain Gorget",
+      "unitCopper": 50
+    },
+    {
+      "itemName": "Corroded Bronze Chain Leggings",
+      "unitCopper": 136
+    },
+    {
+      "itemName": "Corroded Bronze Chain Mask",
+      "unitCopper": 50
+    },
+    {
+      "itemName": "Corroded Bronze Chain Shoulderguards",
+      "unitCopper": 86
+    },
+    {
+      "itemName": "Corroded Bronze Chain Tunic",
+      "unitCopper": 106
+    },
+    {
+      "itemName": "Corroded Bronze Chain Waistguard",
+      "unitCopper": 104
+    },
+    {
+      "itemName": "Corroded Bronze Chain Wristguard",
+      "unitCopper": 107
+    },
+    {
+      "itemName": "Corroded Bronze Dagger",
+      "unitCopper": 125
+    },
+    {
+      "itemName": "Corroded Bronze Greatsword",
+      "unitCopper": 60
+    },
+    {
+      "itemName": "Corroded Bronze Kite Shield",
+      "unitCopper": 65
+    },
+    {
+      "itemName": "Corroded Bronze Long Spear",
+      "unitCopper": 163
+    },
+    {
+      "itemName": "Corroded Bronze Longsword",
+      "unitCopper": 125
+    },
+    {
+      "itemName": "Corroded Bronze Mace",
+      "unitCopper": 125
+    },
+    {
+      "itemName": "Corroded Bronze Maul",
+      "unitCopper": 150
+    },
+    {
+      "itemName": "Corroded Bronze Plate Arming Doublet",
+      "unitCopper": 60
+    },
+    {
+      "itemName": "Corroded Bronze Plate Boots",
+      "unitCopper": 153
+    },
+    {
+      "itemName": "Corroded Bronze Plate Bracer",
+      "unitCopper": 158
+    },
+    {
+      "itemName": "Corroded Bronze Plate Breastplate",
+      "unitCopper": 75
+    },
+    {
+      "itemName": "Corroded Bronze Plate Cloak",
+      "unitCopper": 129
+    },
+    {
+      "itemName": "Corroded Bronze Plate Collar",
+      "unitCopper": 60
+    },
+    {
+      "itemName": "Corroded Bronze Plate Girdle",
+      "unitCopper": 157
+    },
+    {
+      "itemName": "Corroded Bronze Plate Greaves",
+      "unitCopper": 170
+    },
+    {
+      "itemName": "Corroded Bronze Plate Helm",
+      "unitCopper": 151
+    },
+    {
+      "itemName": "Corroded Bronze Plate Pauldrons",
+      "unitCopper": 160
+    },
+    {
+      "itemName": "Corroded Bronze Plate Visor",
+      "unitCopper": 164
+    },
+    {
+      "itemName": "Corroded Bronze Scimitar",
+      "unitCopper": 125
+    },
+    {
+      "itemName": "Corroded Bronze Scythe",
+      "unitCopper": 125
+    },
+    {
+      "itemName": "Corroded Bronze Shortsword",
+      "unitCopper": 125
+    },
+    {
+      "itemName": "Corroded Bronze Spear",
+      "unitCopper": 131
+    },
+    {
+      "itemName": "Corroded Bronze Tower Shield",
+      "unitCopper": 75
+    },
+    {
+      "itemName": "Corroded Bronze Trident",
+      "unitCopper": 125
+    },
+    {
+      "itemName": "Corroded Bronze War Lance",
+      "unitCopper": 150
+    },
+    {
+      "itemName": "Corroded Bronze Warhammer",
+      "unitCopper": 125
+    },
+    {
+      "itemName": "Cotton Scraps",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Cracked Beetle Mandible",
+      "unitCopper": 63
+    },
+    {
+      "itemName": "Cracked Beetle Thorax",
+      "unitCopper": 48
+    },
+    {
+      "itemName": "Cracked Fine Wood Staff",
+      "unitCopper": 939
+    },
+    {
+      "itemName": "Cracked Staff",
+      "unitCopper": 500
+    },
+    {
+      "itemName": "Crude Wood Finish",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Crypt Scarab Carapace",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Crypt Scarab Eye",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Crypt Scarab Leg",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Damaged Fungus Cap",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Damaged Fungus Stem",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Damaged Fungus Volva",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Damaged Snake Vertebra",
+      "unitCopper": 16
+    },
+    {
+      "itemName": "Deep Beetle Carapace",
+      "unitCopper": 4
+    },
+    {
+      "itemName": "Deep Beetle Eye",
+      "unitCopper": 13
+    },
+    {
+      "itemName": "Deep Beetle Legs",
+      "unitCopper": 4
+    },
+    {
+      "itemName": "Deepgulp Runt's Scalp",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Deepweb Eye",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Dense Gold Carapace",
+      "unitCopper": 1575
+    },
+    {
+      "itemName": "Diamond",
+      "unitCopper": 82
+    },
+    {
+      "itemName": "Diseased Bat Blood",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Drake Claw",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Dusty Scarab Leg",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Emerald",
+      "unitCopper": 145
+    },
+    {
+      "itemName": "Encrusted Calafreyan Buckler",
+      "unitCopper": 4
+    },
+    {
+      "itemName": "Encrusted Calafreyan Dagger",
+      "unitCopper": 12
+    },
+    {
+      "itemName": "Encrusted Calafreyan Spear",
+      "unitCopper": 12
+    },
+    {
+      "itemName": "Encrusted Heartleaf Spangenhelm",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Eth-ur Geological Journal Page",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Fire Beetle Carapace",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Fire Beetle Eye",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Fire Beetle Gland",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Fire Beetle Legs",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Flawed Amber",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Flawed Black Pearl",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Flawed Black Sapphire",
+      "unitCopper": 14
+    },
+    {
+      "itemName": "Flawed Bloodstone",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Flawed Blue Diamond",
+      "unitCopper": 19
+    },
+    {
+      "itemName": "Flawed Cat's Eye Agate",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Flawed Diamond",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Flawed Emerald",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Flawed Fire Emerald",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Flawed Hematite",
+      "unitCopper": 19
+    },
+    {
+      "itemName": "Flawed Jacinth",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Flawed Jade",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Flawed Malachite",
+      "unitCopper": 19
+    },
+    {
+      "itemName": "Flawed Onyx",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Flawed Opal",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Flawed Pearl",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Flawed Peridot",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Flawed Ruby",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Flawed Sapphire",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Flawed Star Rose Quartz",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Flawed Topaz",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Flawed Turquoise",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Flawed Wolf's Eye Agate",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Fractured Beetle Thorax",
+      "unitCopper": 140
+    },
+    {
+      "itemName": "Garlic",
+      "unitCopper": 3
+    },
+    {
+      "itemName": "Ghost Poppy",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Ghoul Skin",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Giant Cinder Beetle Eye",
+      "unitCopper": 70
+    },
+    {
+      "itemName": "Giant Fire Beetle Carapace",
+      "unitCopper": 75
+    },
+    {
+      "itemName": "Giant Fire Beetle Eye",
+      "unitCopper": 30
+    },
+    {
+      "itemName": "Green Drakeling Scale",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Green Drakeling Wing",
+      "unitCopper": 15
+    },
+    {
+      "itemName": "Grilled Basa",
+      "unitCopper": 11
+    },
+    {
+      "itemName": "Grilled Whitefish",
+      "unitCopper": 11
+    },
+    {
+      "itemName": "Grizzled Canine Ear",
+      "unitCopper": 176
+    },
+    {
+      "itemName": "Grouper",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Grub",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Handmade Torch",
+      "unitCopper": 7
+    },
+    {
+      "itemName": "Heavy Cloth Bandage",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Hematite",
+      "unitCopper": 145
+    },
+    {
+      "itemName": "Hide Scraps",
+      "unitCopper": 4
+    },
+    {
+      "itemName": "Hip Quiver",
+      "unitCopper": 25
+    },
+    {
+      "itemName": "Immature Snake Venom Sac",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Imperfect Amber",
+      "unitCopper": 62
+    },
+    {
+      "itemName": "Imperfect Black Pearl",
+      "unitCopper": 62
+    },
+    {
+      "itemName": "Imperfect Blue Diamond",
+      "unitCopper": 63
+    },
+    {
+      "itemName": "Imperfect Carnelian",
+      "unitCopper": 67
+    },
+    {
+      "itemName": "Imperfect Cat's Eye Agate",
+      "unitCopper": 62
+    },
+    {
+      "itemName": "Imperfect Diamond",
+      "unitCopper": 63
+    },
+    {
+      "itemName": "Imperfect Hematite",
+      "unitCopper": 63
+    },
+    {
+      "itemName": "Imperfect Jacinth",
+      "unitCopper": 63
+    },
+    {
+      "itemName": "Imperfect Jade",
+      "unitCopper": 63
+    },
+    {
+      "itemName": "Imperfect Lapis Lazuli",
+      "unitCopper": 67
+    },
+    {
+      "itemName": "Imperfect Malachite",
+      "unitCopper": 63
+    },
+    {
+      "itemName": "Imperfect Onyx",
+      "unitCopper": 63
+    },
+    {
+      "itemName": "Imperfect Pearl",
+      "unitCopper": 63
+    },
+    {
+      "itemName": "Imperfect Peridot",
+      "unitCopper": 63
+    },
+    {
+      "itemName": "Imperfect Ruby",
+      "unitCopper": 62
+    },
+    {
+      "itemName": "Imperfect Star Rose Quartz",
+      "unitCopper": 62
+    },
+    {
+      "itemName": "Imperfect Star Ruby",
+      "unitCopper": 62
+    },
+    {
+      "itemName": "Imperfect Topaz",
+      "unitCopper": 63
+    },
+    {
+      "itemName": "Intact Diseased Bat Bile Duct",
+      "unitCopper": 60
+    },
+    {
+      "itemName": "Intact Grave Rat Ear",
+      "unitCopper": 334
+    },
+    {
+      "itemName": "Jacinth",
+      "unitCopper": 145
+    },
+    {
+      "itemName": "Jackal Tooth",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Jagged Stone",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Lacquered Medallion",
+      "unitCopper": 130
+    },
+    {
+      "itemName": "Lapis Lazuli",
+      "unitCopper": 208
+    },
+    {
+      "itemName": "Large Bat Eye",
+      "unitCopper": 10
+    },
+    {
+      "itemName": "Large Bat Wing",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Leather Scraps",
+      "unitCopper": 7
+    },
+    {
+      "itemName": "Lemon",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Limestone",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Lionleaf",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Low-Quality Jackal Pelt",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Low-Quality Wolf Pelt",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Lumberjack Axe",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Magic Frond",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Makeshift Vial",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Malachite",
+      "unitCopper": 82
+    },
+    {
+      "itemName": "Mangy Beetle Antenna",
+      "unitCopper": 33
+    },
+    {
+      "itemName": "Medium-Quality Wolf Pelt",
+      "unitCopper": 12
+    },
+    {
+      "itemName": "Moldy Sandals",
+      "unitCopper": 8
+    },
+    {
+      "itemName": "Multhele Root",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Mushroom",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Mythical Gnomes",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Onion",
+      "unitCopper": 4
+    },
+    {
+      "itemName": "Onyx",
+      "unitCopper": 145
+    },
+    {
+      "itemName": "Pearl",
+      "unitCopper": 208
+    },
+    {
+      "itemName": "Perfect Fungus Volva",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Poisonous Spider Venom Sac",
+      "unitCopper": 37
+    },
+    {
+      "itemName": "Polished Medallion",
+      "unitCopper": 109
+    },
+    {
+      "itemName": "Potato",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Rat Ear",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Rat Foot",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Rat Tooth",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Ration",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Rattlesnake Skin",
+      "unitCopper": 3
+    },
+    {
+      "itemName": "Raw Ashira Meat",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Raw Bat Meat",
+      "unitCopper": 3
+    },
+    {
+      "itemName": "Raw Beetle Fillet",
+      "unitCopper": 4
+    },
+    {
+      "itemName": "Raw Beetle Meat",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Raw Deep Beetle Meat",
+      "unitCopper": 4
+    },
+    {
+      "itemName": "Raw Goblin Meat",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Raw Human Meat",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Raw Jackal Meat",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Raw Orc Meat",
+      "unitCopper": 4
+    },
+    {
+      "itemName": "Raw Rat Meat",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Raw Snake Meat",
+      "unitCopper": 3
+    },
+    {
+      "itemName": "Raw Wolf Meat",
+      "unitCopper": 3
+    },
+    {
+      "itemName": "Rawhide Belt",
+      "unitCopper": 52
+    },
+    {
+      "itemName": "Rawhide Gloves",
+      "unitCopper": 52
+    },
+    {
+      "itemName": "Rawhide Scraps",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Rawhide Strap",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Resin",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Rigid Stone",
+      "unitCopper": 10
+    },
+    {
+      "itemName": "River Trout",
+      "unitCopper": 4
+    },
+    {
+      "itemName": "Rivet Cutters",
+      "unitCopper": 39
+    },
+    {
+      "itemName": "Rotten Canine Ear",
+      "unitCopper": 22
+    },
+    {
+      "itemName": "Rotten Rodent Ear",
+      "unitCopper": 29
+    },
+    {
+      "itemName": "Rusty Axe",
+      "unitCopper": 12
+    },
+    {
+      "itemName": "Rusty Battle Axe",
+      "unitCopper": 25
+    },
+    {
+      "itemName": "Rusty Dagger",
+      "unitCopper": 13
+    },
+    {
+      "itemName": "Rusty Great Scythe",
+      "unitCopper": 25
+    },
+    {
+      "itemName": "Rusty Greatsword",
+      "unitCopper": 25
+    },
+    {
+      "itemName": "Rusty Iron Chain Cloak",
+      "unitCopper": 153
+    },
+    {
+      "itemName": "Rusty Iron Chain Coif",
+      "unitCopper": 173
+    },
+    {
+      "itemName": "Rusty Iron Chain Leggings",
+      "unitCopper": 204
+    },
+    {
+      "itemName": "Rusty Iron Chain Mask",
+      "unitCopper": 153
+    },
+    {
+      "itemName": "Rusty Iron Great Scythe",
+      "unitCopper": 921
+    },
+    {
+      "itemName": "Rusty Iron Plate Cloak",
+      "unitCopper": 204
+    },
+    {
+      "itemName": "Rusty Iron Plate Greaves",
+      "unitCopper": 270
+    },
+    {
+      "itemName": "Rusty Iron Plate Pauldrons",
+      "unitCopper": 244
+    },
+    {
+      "itemName": "Rusty Kite Shield",
+      "unitCopper": 26
+    },
+    {
+      "itemName": "Rusty Long Spear",
+      "unitCopper": 25
+    },
+    {
+      "itemName": "Rusty Longsword",
+      "unitCopper": 12
+    },
+    {
+      "itemName": "Rusty Mace",
+      "unitCopper": 12
+    },
+    {
+      "itemName": "Rusty Maul",
+      "unitCopper": 25
+    },
+    {
+      "itemName": "Rusty Scimitar",
+      "unitCopper": 13
+    },
+    {
+      "itemName": "Rusty Scythe",
+      "unitCopper": 12
+    },
+    {
+      "itemName": "Rusty Shortsword",
+      "unitCopper": 13
+    },
+    {
+      "itemName": "Rusty Spear",
+      "unitCopper": 12
+    },
+    {
+      "itemName": "Rusty Steel Scimitar",
+      "unitCopper": 250
+    },
+    {
+      "itemName": "Rusty Tower Shield",
+      "unitCopper": 34
+    },
+    {
+      "itemName": "Rusty Trident",
+      "unitCopper": 12
+    },
+    {
+      "itemName": "Rusty War Lance",
+      "unitCopper": 22
+    },
+    {
+      "itemName": "Rusty Warhammer",
+      "unitCopper": 12
+    },
+    {
+      "itemName": "Savage Wolf Claw",
+      "unitCopper": 25
+    },
+    {
+      "itemName": "Scarab Carapace",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Scarab Eye",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Scarab Leg",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Scarab Thorax Plate",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Scorched Skeletal Remains",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Scroll: Arcane Spear I",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Scroll: Distress",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Scroll: Shoot",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Scroll: Throw",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Scroll: Woodskin",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Scuffed Canine Ear",
+      "unitCopper": 138
+    },
+    {
+      "itemName": "Seam Ripper",
+      "unitCopper": 37
+    },
+    {
+      "itemName": "Severed Deep Beetle Leg",
+      "unitCopper": 9
+    },
+    {
+      "itemName": "Shattered Beetle Thorax",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Shattered Snake Vertebra",
+      "unitCopper": 4
+    },
+    {
+      "itemName": "Simple Medallion",
+      "unitCopper": 68
+    },
+    {
+      "itemName": "Skeleton Jawbone",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Snake Egg",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Snake Fang",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Snake Skin",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Spider Legs",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Spider Silk",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Spider Venom Sac",
+      "unitCopper": 12
+    },
+    {
+      "itemName": "Spiderling Eye",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Spirit World Ch. 6",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Strong Fungus Hyphea",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Sturdy Ingot Mold",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Tarnished Medallion",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Tattered Cloth Belt",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Tattered Cloth Boots",
+      "unitCopper": 21
+    },
+    {
+      "itemName": "Tattered Cloth Bracer",
+      "unitCopper": 21
+    },
+    {
+      "itemName": "Tattered Cloth Cap",
+      "unitCopper": 25
+    },
+    {
+      "itemName": "Tattered Cloth Cape",
+      "unitCopper": 21
+    },
+    {
+      "itemName": "Tattered Cloth Gloves",
+      "unitCopper": 21
+    },
+    {
+      "itemName": "Tattered Cloth Gorget",
+      "unitCopper": 20
+    },
+    {
+      "itemName": "Tattered Cloth Mantle",
+      "unitCopper": 27
+    },
+    {
+      "itemName": "Tattered Cloth Pantaloons",
+      "unitCopper": 31
+    },
+    {
+      "itemName": "Tattered Cloth Robe",
+      "unitCopper": 37
+    },
+    {
+      "itemName": "Tattered Cloth Shirt",
+      "unitCopper": 21
+    },
+    {
+      "itemName": "Tattered Cloth Tunic",
+      "unitCopper": 40
+    },
+    {
+      "itemName": "Tattered Cloth Veil",
+      "unitCopper": 21
+    },
+    {
+      "itemName": "Tattered Hide Boots",
+      "unitCopper": 75
+    },
+    {
+      "itemName": "Tattered Hide Bracer",
+      "unitCopper": 75
+    },
+    {
+      "itemName": "Tattered Hide Gloves",
+      "unitCopper": 30
+    },
+    {
+      "itemName": "Tattered Hide Gorget",
+      "unitCopper": 30
+    },
+    {
+      "itemName": "Tattered Hide Leggings",
+      "unitCopper": 41
+    },
+    {
+      "itemName": "Tattered Hide Tunic",
+      "unitCopper": 118
+    },
+    {
+      "itemName": "Tattered Hide Vest",
+      "unitCopper": 75
+    },
+    {
+      "itemName": "Tattered Rawhide Belt",
+      "unitCopper": 37
+    },
+    {
+      "itemName": "Tattered Rawhide Boots",
+      "unitCopper": 37
+    },
+    {
+      "itemName": "Tattered Rawhide Bracer",
+      "unitCopper": 37
+    },
+    {
+      "itemName": "Tattered Rawhide Cap",
+      "unitCopper": 41
+    },
+    {
+      "itemName": "Tattered Rawhide Cloak",
+      "unitCopper": 37
+    },
+    {
+      "itemName": "Tattered Rawhide Gloves",
+      "unitCopper": 37
+    },
+    {
+      "itemName": "Tattered Rawhide Gorget",
+      "unitCopper": 40
+    },
+    {
+      "itemName": "Tattered Rawhide Leggings",
+      "unitCopper": 47
+    },
+    {
+      "itemName": "Tattered Rawhide Mask",
+      "unitCopper": 37
+    },
+    {
+      "itemName": "Tattered Rawhide Shoulderpads",
+      "unitCopper": 43
+    },
+    {
+      "itemName": "Tattered Rawhide Tunic",
+      "unitCopper": 56
+    },
+    {
+      "itemName": "Tattered Rawhide Vest",
+      "unitCopper": 37
+    },
+    {
+      "itemName": "Tattered Wool Belt",
+      "unitCopper": 40
+    },
+    {
+      "itemName": "Tattered Wool Boots",
+      "unitCopper": 43
+    },
+    {
+      "itemName": "Tattered Wool Bracer",
+      "unitCopper": 42
+    },
+    {
+      "itemName": "Tattered Wool Cape",
+      "unitCopper": 40
+    },
+    {
+      "itemName": "Tattered Wool Gloves",
+      "unitCopper": 40
+    },
+    {
+      "itemName": "Tattered Wool Pantaloons",
+      "unitCopper": 62
+    },
+    {
+      "itemName": "Tattered Wool Robe",
+      "unitCopper": 81
+    },
+    {
+      "itemName": "Tattered Wool Tunic",
+      "unitCopper": 75
+    },
+    {
+      "itemName": "Tattered Wool Veil",
+      "unitCopper": 43
+    },
+    {
+      "itemName": "Tin Cauldron",
+      "unitCopper": 27
+    },
+    {
+      "itemName": "Tomato",
+      "unitCopper": 12
+    },
+    {
+      "itemName": "Topaz",
+      "unitCopper": 208
+    },
+    {
+      "itemName": "Torch",
+      "unitCopper": 17
+    },
+    {
+      "itemName": "Turtle Shell Shield",
+      "unitCopper": 27
+    },
+    {
+      "itemName": "Unusual Jackal Pelt",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Voucher from Ailis Hal'kareth",
+      "unitCopper": 600
+    },
+    {
+      "itemName": "Wasp Wing",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Watery Bat Membrane",
+      "unitCopper": 32
+    },
+    {
+      "itemName": "Weak Fungus Hyphea",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Weathered Figurine",
+      "unitCopper": 24
+    },
+    {
+      "itemName": "Weathered Medallion",
+      "unitCopper": 18
+    },
+    {
+      "itemName": "Weighty Stone",
+      "unitCopper": 9
+    },
+    {
+      "itemName": "Wererat Pelt",
+      "unitCopper": 5
+    },
+    {
+      "itemName": "Whitefish",
+      "unitCopper": 6
+    },
+    {
+      "itemName": "Wild Carrots",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Wolf Blood",
+      "unitCopper": 83
+    },
+    {
+      "itemName": "Wolf Tooth",
+      "unitCopper": 2
+    },
+    {
+      "itemName": "Wood",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Wood Board",
+      "unitCopper": 1
+    },
+    {
+      "itemName": "Wool Bandage",
+      "unitCopper": 76
+    },
+    {
+      "itemName": "Wool Scraps",
+      "unitCopper": 3
+    },
+    {
+      "itemName": "Worn Bow",
+      "unitCopper": 25
+    },
+    {
+      "itemName": "Worn Buckler",
+      "unitCopper": 13
+    },
+    {
+      "itemName": "Worn Fine Wood Bow",
+      "unitCopper": 250
+    },
+    {
+      "itemName": "Worn Fine Wood Buckler",
+      "unitCopper": 42
+    },
+    {
+      "itemName": "Worn Fine Wood Great Staff",
+      "unitCopper": 312
+    },
+    {
+      "itemName": "Worn Great Staff",
+      "unitCopper": 61
+    }
+  ]
+}

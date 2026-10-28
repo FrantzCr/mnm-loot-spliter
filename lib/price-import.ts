@@ -228,7 +228,8 @@ function readPricesFromJson(text: string): PriceBookEntry[] {
   return list;
 }
 
-function extractPriceList(parsed: unknown): PriceBookEntry[] | null {
+/** Price list from an export payload (`{ prices: [...] }`) or a bare array; null when neither. */
+export function extractPriceList(parsed: unknown): PriceBookEntry[] | null {
   if (Array.isArray(parsed)) {
     return parsed.flatMap((row) => {
       if (!row || typeof row !== "object" || Array.isArray(row)) return [];

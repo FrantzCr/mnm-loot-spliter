@@ -144,3 +144,7 @@
 ## 0.2.3
 
 - **2026-10-28** — In-app update failed with "Erreur lors de l'ouverture du fichier en écriture … resources\register\node.exe": `app.exit(0)` skips the window `Destroyed` event, so the bundled Node kept running and NSIS could not overwrite it. Fix: `install_update` stops the sidecar and clears port 14721 before launching the installer; `RunEvent::Exit` stops it on every exit. From 0.2.2 the update can still hit the error once (close node.exe, then Retry). Also: chat announce preview styled like the in-game party chat.
+
+## 0.2.4
+
+- **2026-10-28** — Shared price book: `shared/price-book.json` (export of the author's price book, 400 items) served from raw.githubusercontent. Prices page → **Fill gaps from the shared price book** (`/api/prices/shared`, `lib/shared-prices.ts`): only items with no local price, written straight to the book (no "needs a decision"), unedited loot lines pick the price up at once. Refresh the file by re-exporting and committing.

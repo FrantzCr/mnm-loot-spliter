@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { coinsToCopper, copperToCoins, EMPTY_COINS, type CoinParts } from "@/lib/money";
 import type { PriceImportPreview } from "@/lib/price-import";
 import type { MnmdbImportResult } from "@/lib/mnmdb-prices";
+import type { SharedPricesResult } from "@/lib/shared-prices";
 
 type CatalogRow = {
   itemKey: string;
@@ -84,16 +85,20 @@ export function PriceBook() {
   const [importNotice, setImportNotice] = useState<{ title: string; body: string } | null>(null);
   const [mnmdbBusy, setMnmdbBusy] = useState(false);
   const [mnmdbMeta, setMnmdbMeta] = useState<MnmdbImportResult | null>(null);
+  const [sharedBusy, setSharedBusy] = useState(false);
+  const [sharedMeta, setSharedMeta] = useState<SharedPricesResult | null>(null);
   const importInput = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     try {
-      const [body, mnmdb] = await Promise.all([
+      const [body, mnmdb, shared] = await Promise.all([
         api<{ prices: CatalogRow[] }>("/api/prices"),
         api<{ meta: MnmdbImportResult | null }>("/api/prices/mnmdb").catch(() => ({ meta: null })),
+        api<{ meta: SharedPricesResult | null }>("/api/prices/shared").catch(() => ({ meta: null })),
       ]);
       setItems(body.prices);
       setMnmdbMeta(mnmdb.meta);
+      setSharedMeta(shared.meta);
       setError(null);
     } catch (caught) {
       setError(explain(caught, ErrorCode.pricesLoadFailed));
@@ -101,6 +106,25 @@ export function PriceBook() {
       setLoading(false);
     }
   }, [explain]);
+
+  async function importFromShared() {
+    setSharedBusy(true);
+    setImportNotice(null);
+    setError(null);
+    try {
+      const body = await api<{ result: SharedPricesResult }>("/api/prices/shared", { method: "POST" });
+      setSharedMeta(body.result);
+      setImportNotice({
+        title: copy.prices.sharedTitle,
+        body: copy.prices.sharedDone(body.result.added, body.result.skippedExisting),
+      });
+      await load();
+    } catch (caught) {
+      setError(explain(caught, ErrorCode.sharedPricesImportFailed));
+    } finally {
+      setSharedBusy(false);
+    }
+  }
 
   async function importFromMnmdb() {
     setMnmdbBusy(true);
@@ -255,6 +279,25 @@ export function PriceBook() {
               {saving ? copy.common.saving : copy.prices.savePrice}
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle as="h3">{copy.prices.sharedTitle}</CardTitle>
+          <CardDescription>{copy.prices.sharedHelp}</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" disabled={sharedBusy || mnmdbBusy || importing} onClick={() => void importFromShared()}>
+              {sharedBusy ? copy.prices.sharedBusy : copy.prices.sharedImport}
+            </Button>
+          </div>
+          {sharedMeta ? (
+            <p className="text-sm text-muted-foreground">
+              {copy.prices.sharedMeta(new Date(sharedMeta.importedAt).toLocaleString(), sharedMeta.added)}
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 

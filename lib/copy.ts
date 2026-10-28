@@ -314,6 +314,14 @@ const en = {
     mnmdbMeta: (importedAt: string, added: number) =>
       `Last MnMdb fill: ${added} added · ${importedAt}`,
     mnmdbAttribution: "From mnm-db.com — mnm-tools community vendor sales",
+    sharedTitle: "Shared price book",
+    sharedHelp:
+      "Resale prices kept by the MnM Loot Splitter author, from real vendor sales. Only fills items that have no local price yet — your prices stay untouched, and the loot picks them up right away.",
+    sharedImport: "Fill gaps from the shared price book",
+    sharedBusy: "Fetching the shared price book…",
+    sharedDone: (added: number, skipped: number) =>
+      `Shared price book: ${added} price${added === 1 ? "" : "s"} added, ${skipped} already had a local price.`,
+    sharedMeta: (importedAt: string, added: number) => `Last shared fill: ${added} added · ${importedAt}`,
   },
   person: {
     loading: "Loading loot…",
@@ -435,6 +443,9 @@ const en = {
     [ErrorCode.mnmdbTooLarge]: "The MnMdb file is too large.",
     [ErrorCode.mnmdbEmpty]: "MnMdb had no usable vendor prices.",
     [ErrorCode.mnmdbImportFailed]: "The MnMdb import failed.",
+    [ErrorCode.sharedPricesFetchFailed]: "Could not reach the shared price book on GitHub.",
+    [ErrorCode.sharedPricesEmpty]: "The shared price book had no usable prices.",
+    [ErrorCode.sharedPricesImportFailed]: "The shared price book import failed.",
     [ErrorCode.personLoadFailed]: "This character could not be loaded.",
     [ErrorCode.personRenameFailed]: "The name was not changed.",
     [ErrorCode.personActionFailed]: "The operation failed.",
@@ -746,6 +757,14 @@ const fr: Copy = {
       `Depuis mnm-db.com (mnm-tools) : ${added} prix ajouté${added > 1 ? "s" : ""}, ${skipped} avaient déjà un prix local.`,
     mnmdbMeta: (importedAt, added) => `Dernier remplissage MnMdb : ${added} ajouté${added > 1 ? "s" : ""} · ${importedAt}`,
     mnmdbAttribution: "Depuis mnm-db.com — ventes vendor communautaires mnm-tools",
+    sharedTitle: "Carnet de prix partagé",
+    sharedHelp:
+      "Prix de revente tenus par l'auteur de MnM Loot Splitter, issus de vraies ventes vendor. Ne remplit que les objets sans prix local — tes prix ne bougent pas, et le butin les prend en compte tout de suite.",
+    sharedImport: "Compléter depuis le carnet partagé",
+    sharedBusy: "Téléchargement du carnet partagé…",
+    sharedDone: (added, skipped) =>
+      `Carnet partagé : ${added} prix ajouté${added > 1 ? "s" : ""}, ${skipped} avaient déjà un prix local.`,
+    sharedMeta: (importedAt, added) => `Dernier remplissage partagé : ${added} ajouté${added > 1 ? "s" : ""} · ${importedAt}`,
   },
   person: {
     loading: "Chargement du butin…",
@@ -869,6 +888,9 @@ const fr: Copy = {
     [ErrorCode.mnmdbTooLarge]: "Le fichier MnMdb est trop volumineux.",
     [ErrorCode.mnmdbEmpty]: "MnMdb n'avait aucun prix vendor utilisable.",
     [ErrorCode.mnmdbImportFailed]: "L'import MnMdb a échoué.",
+    [ErrorCode.sharedPricesFetchFailed]: "Impossible de joindre le carnet partagé sur GitHub.",
+    [ErrorCode.sharedPricesEmpty]: "Le carnet partagé n'avait aucun prix utilisable.",
+    [ErrorCode.sharedPricesImportFailed]: "L'import du carnet partagé a échoué.",
     [ErrorCode.personLoadFailed]: "Impossible de charger ce personnage.",
     [ErrorCode.personRenameFailed]: "Le nom n'a pas été changé.",
     [ErrorCode.personActionFailed]: "L'opération a échoué.",
@@ -1181,6 +1203,14 @@ const es: Copy = {
     mnmdbMeta: (importedAt, added) =>
       `Último relleno MnMdb: ${added} añadido${added === 1 ? "" : "s"} · ${importedAt}`,
     mnmdbAttribution: "Desde mnm-db.com — ventas a vendedor comunitarias de mnm-tools",
+    sharedTitle: "Libro de precios compartido",
+    sharedHelp:
+      "Precios de reventa mantenidos por el autor de MnM Loot Splitter, de ventas reales a vendedor. Solo rellena objetos sin precio local — tus precios no cambian y el botín los usa al momento.",
+    sharedImport: "Completar desde el libro compartido",
+    sharedBusy: "Descargando el libro compartido…",
+    sharedDone: (added, skipped) =>
+      `Libro compartido: ${added} precio${added === 1 ? "" : "s"} añadido${added === 1 ? "" : "s"}, ${skipped} ya tenían precio local.`,
+    sharedMeta: (importedAt, added) => `Último relleno compartido: ${added} añadidos · ${importedAt}`,
   },
   person: {
     loading: "Cargando el botín…",
@@ -1304,6 +1334,9 @@ const es: Copy = {
     [ErrorCode.mnmdbTooLarge]: "El archivo de MnMdb es demasiado grande.",
     [ErrorCode.mnmdbEmpty]: "MnMdb no tenía precios de vendedor utilizables.",
     [ErrorCode.mnmdbImportFailed]: "La importación de MnMdb falló.",
+    [ErrorCode.sharedPricesFetchFailed]: "No se pudo contactar con el libro compartido en GitHub.",
+    [ErrorCode.sharedPricesEmpty]: "El libro compartido no tenía precios utilizables.",
+    [ErrorCode.sharedPricesImportFailed]: "La importación del libro compartido falló.",
     [ErrorCode.personLoadFailed]: "No se pudo cargar este personaje.",
     [ErrorCode.personRenameFailed]: "El nombre no se cambió.",
     [ErrorCode.personActionFailed]: "La operación falló.",
