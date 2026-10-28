@@ -12,6 +12,24 @@ UI languages: **English**, **French**, and **Spanish** (Language menu).
 > read process memory, or capture network traffic. It only opens Ledger files
 > that are already on disk.
 
+### In a minute
+
+1. Download the setup `.exe` from the latest [Release](https://github.com/FrantzCr/mnm-loot-spliter/releases) and install it.
+2. Open **Options**, point it at the game folder, and choose **Use this folder**.
+3. Open **Group**, add the people you play with, and loot as usual. At the end, read
+   **Who gives what to whom** and paste the split into chat.
+
+### Contents
+
+- [Download the installer](#download-the-installer-easiest)
+- [Using the app](#using-the-app)
+- [How the split works](#how-the-split-works)
+- [Something looks wrong](#something-looks-wrong)
+- [Features](#features)
+- [Build the Windows installer yourself](#build-the-windows-installer-yourself)
+- [For developers](#for-developers-run-from-source)
+- [Data & privacy](#data--privacy)
+
 ---
 
 ## Download the installer (easiest)
@@ -20,7 +38,7 @@ Pre-built Windows setups are published on **this same repository**, under
 [**Releases**](https://github.com/FrantzCr/mnm-loot-spliter/releases):
 
 1. Open the latest release.
-2. Download the `.exe` (for example `MnM_Loot_Splitter_0.1.2_x64-setup.exe`).
+2. Download the `.exe` (for example `MnM_Loot_Splitter_<version>_x64-setup.exe`).
 3. Run it and install (per-user, no admin required).
 
 If **Windows SmartScreen** appears (“Windows protected your PC”), choose **More info**, then **Run anyway**. The installer is unsigned until a code-signing certificate is used.
@@ -137,11 +155,87 @@ recorded separately and do not enter the group pot.
 
 ---
 
+## How the split works
+
+The group page answers one question: *who should hand coin to whom so everyone ends
+up with the same value?* No item changes hands — whoever looted something keeps it,
+and the difference is evened out in coin.
+
+**1. What each person holds.** Every loot line belongs to the character who looted
+it, valued at its **resale price** from your price book. Items with no known price
+are left out of the split (the totals tell you how many). Coin taken from corpses is
+already shared by the game itself, so it only shows in the session totals.
+
+**2. What each person should get.** Each item's value is divided between the members
+who were **in the group when it was looted**. Someone who joined late gets nothing
+from earlier drops; someone who left gets nothing from later ones. Leftover copper
+from an uneven division goes to the first members of the list.
+
+**3. The balance.** Balance = value held − fair share.
+
+| In the Members list | Meaning |
+| --- | --- |
+| **+** (green), bar to the right | Holds more than their share: pays out |
+| **−** (red), bar to the left | Holds less than their share: receives |
+| **even** | Nothing to do |
+
+**4. Who gives what to whom.** The biggest payer is matched with the biggest receiver,
+for the smaller of the two amounts, and so on until everyone is even. This keeps the
+number of trades low. A line like `Aby → Mezma: 10 copper` means Aby gives Mezma 10
+copper.
+
+Example, with a fair share of 10 each:
+
+| | Holds | Share | Balance |
+| --- | --- | --- | --- |
+| Aby | 25 | 10 | +15 |
+| Shorn | 12 | 10 | +2 |
+| Foxman | 3 | 10 | −7 |
+| Mezma | 0 | 10 | −10 |
+
+→ `Aby → Mezma: 10`, `Aby → Foxman: 5`, `Shorn → Foxman: 2`.
+
+**Settling as you go.** The **=** button on a member records their trades as done, so
+they drop out of the remaining list. **Settle & leave** does that and marks them as
+gone. Members who left and have nothing left to settle are hidden from the list (their
+share still counts).
+
+**Reset pot vs Close the group.** **Reset pot** keeps the same people but starts a new,
+empty pot — handy between two camps or after paying everyone. Previous pots stay
+readable from the **Show** menu, under *Previous pots*. **Close the group** ends it for
+good; it moves to *Closed groups* in the same menu, read-only, and its unsold items go to
+**Waiting to sell**.
+
+**In-game party.** When the game's social log shows someone joining or leaving your
+party, the group page offers to add them or mark them as gone. Nothing changes until
+you click.
+
+---
+
+## Something looks wrong
+
+| You see | Try this |
+| --- | --- |
+| No loot shows up | Check the folder in **Options** points at the game folder or a `Ledger` folder, and keep the app open while you play: the game deletes its Ledger files when it closes. |
+| An item counts for nothing | It has no resale price yet. Set one on the prices page, or use **Fill gaps from MnMdb**. The price applies to past loot too. |
+| Someone's share looks wrong | Check when they joined and left (shown under their name). Loot only counts for people present at that moment. |
+| A member is missing from the list | They left and have nothing to settle, so they are hidden; their share is still counted. |
+| The pot from earlier is gone | It was reset. Pick it under *Previous pots* in the **Show** menu. |
+| The desktop window doesn't open | Look at the logs in `%LOCALAPPDATA%\com.mnm-loot-spliter.register\logs\`. |
+
+The split is only as good as the prices and the join / leave times — when in doubt,
+check those first.
+
+---
+
 ## Features
 
 - **Ledger watch** — scan / watch the client folder; copy loot into local SQLite
 - **Per-character loot** — loot tied to the character named in the journal
 - **Group value split** — fair share from known resale prices; settle who pays whom
+- **Join / leave times** — late arrivals and early leavers only share the loot of their time in the group
+- **Reset pot & history** — start a fresh pot with the same people; past pots and closed groups stay readable
+- **In-game party follow-up** — offers to add or remove members as the game's party changes
 - **Price book** — unit prices you enter; apply to past and future loot of that item
 - **Pending sell** — items from closed groups waiting for a vendor sale (or dismiss)
 - **Recent players** — people from recently closed groups, for quick re-add

@@ -176,6 +176,10 @@ const en = {
     switchLabel: "Show",
     activeSuffix: "active",
     archivesLabel: (count: number) => `Closed groups (${count})`,
+    potsLabel: (count: number) => `Previous pots (${count})`,
+    potLabel: (started: string, ended: string) => `Pot ${started} → ${ended}`,
+    potNotice: (started: string, ended: string) =>
+      `Previous pot of this group, from ${started} to ${ended}, cleared by Reset pot. Its loot and split stay readable.`,
     archivedBadge: "Archived · read-only",
     archivedNotice: (started: string, closed: string) =>
       `Closed group from ${started} to ${closed}. Loot and the last split stay readable; new loot only goes to the active group.`,
@@ -605,6 +609,10 @@ const fr: Copy = {
     switchLabel: "Afficher",
     activeSuffix: "actif",
     archivesLabel: (count) => `Groupes clôturés (${count})`,
+    potsLabel: (count) => `Pots précédents (${count})`,
+    potLabel: (started, ended) => `Pot ${started} → ${ended}`,
+    potNotice: (started, ended) =>
+      `Pot précédent de ce groupe, du ${started} au ${ended}, vidé par Reset pot. Son butin et son partage restent consultables.`,
     archivedBadge: "Archivé · lecture seule",
     archivedNotice: (started, closed) =>
       `Groupe clôturé, du ${started} au ${closed}. Le butin et le dernier partage restent consultables ; le nouveau butin va uniquement au groupe actif.`,
@@ -1032,6 +1040,10 @@ const es: Copy = {
     switchLabel: "Mostrar",
     activeSuffix: "activo",
     archivesLabel: (count) => `Grupos cerrados (${count})`,
+    potsLabel: (count) => `Botes anteriores (${count})`,
+    potLabel: (started, ended) => `Bote ${started} → ${ended}`,
+    potNotice: (started, ended) =>
+      `Bote anterior de este grupo, del ${started} al ${ended}, vaciado con Reset pot. Su botín y su reparto siguen visibles.`,
     archivedBadge: "Archivado · solo lectura",
     archivedNotice: (started, closed) =>
       `Grupo cerrado, del ${started} al ${closed}. El botín y el último reparto siguen visibles; el botín nuevo solo va al grupo activo.`,

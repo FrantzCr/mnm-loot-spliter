@@ -37,6 +37,8 @@ export type PartySummary = {
   startedAt: string;
   closedAt: string | null;
   lootCount: number;
+  /** Past pot (session epoch) of the open group, cleared by Reset pot; null for the group itself. */
+  pot: number | null;
 };
 
 export type PartyView = {
@@ -46,6 +48,8 @@ export type PartyView = {
     status: PartyStatus;
     startedAt: string;
     closedAt: string | null;
+    /** Set when viewing a past pot of the open group (read-only). */
+    pot: number | null;
     mode: SplitMode | null;
     presences: PartyPresence[];
   };
@@ -160,14 +164,47 @@ export function listParties(db: DatabaseSync = getDb()): PartySummary[] {
     closed_at: string | null;
     loot_count: number | bigint;
   }>;
-  return rows.map((row) => ({
+  const summaries: PartySummary[] = rows.map((row) => ({
     id: row.id,
     name: row.name,
     status: row.status === "open" ? "open" : "closed",
     startedAt: row.started_at,
     closedAt: row.closed_at,
     lootCount: asNumber(row.loot_count),
+    pot: null,
   }));
+  const open = summaries.find((party) => party.status === "open");
+  if (!open) return summaries;
+  // Past pots of the open group, newest first; pots that never got loot are skipped.
+  const pots = (
+    db
+      .prepare(
+        `SELECT l.group_epoch AS epoch, COUNT(*) AS loot_count,
+                MIN(NULLIF(l.looted_at, '')) AS first_at, MAX(NULLIF(l.looted_at, '')) AS last_at
+         FROM loot_entries l JOIN parties p ON p.id = l.group_id
+         WHERE l.group_id = ? AND l.group_epoch < p.session_epoch
+         GROUP BY l.group_epoch
+         ORDER BY l.group_epoch DESC`,
+      )
+      .all(open.id) as Array<{ epoch: number | bigint; loot_count: number | bigint; first_at: string | null; last_at: string | null }>
+  ).map((row) => potSummary(open, row));
+  return [open, ...pots, ...summaries.filter((party) => party !== open)];
+}
+
+function potSummary(
+  open: PartySummary,
+  row: { epoch: number | bigint; loot_count: number | bigint; first_at: string | null; last_at: string | null },
+): PartySummary {
+  const epoch = asNumber(row.epoch);
+  return {
+    ...open,
+    status: "closed",
+    // The first pot starts with the group; later ones from their first loot (reset times are not kept).
+    startedAt: epoch === 0 ? open.startedAt : (row.first_at ?? open.startedAt),
+    closedAt: row.last_at,
+    lootCount: asNumber(row.loot_count),
+    pot: epoch,
+  };
 }
 
 export function setPartyMode(mode: SplitMode, db: DatabaseSync = getDb()): PartyView {
@@ -336,7 +373,11 @@ function presenceRow(db: DatabaseSync, partyId: string, presenceId: string): { i
  * Read the active group, or — with `partyId` — any group including closed archives. Archives are
  * read-only because every mutation still targets the open party only.
  */
-export function readParty(db: DatabaseSync = getDb(), partyId: string | null = null): PartyView {
+export function readParty(
+  db: DatabaseSync = getDb(),
+  partyId: string | null = null,
+  pot: number | null = null,
+): PartyView {
   syncCharactersFromWatch(db);
   const people = (
     db.prepare("SELECT id, name, server_name FROM people WHERE on_machine = 1 ORDER BY name COLLATE NOCASE").all() as Array<{
@@ -367,6 +408,10 @@ export function readParty(db: DatabaseSync = getDb(), partyId: string | null = n
     if (partyId) throw new Error(ErrorCode.groupMissing);
     return { party: null, people, lines: [], split: null, parties, gameParty: null };
   }
+  const pastPot =
+    pot == null ? null : (parties.find((summary) => summary.id === party.id && summary.pot === pot) ?? null);
+  if (pot != null && !pastPot) throw new Error(ErrorCode.groupMissing);
+  const epoch = pastPot ? pot : party.session_epoch;
 
   const presences = (
     db
@@ -408,7 +453,7 @@ export function readParty(db: DatabaseSync = getDb(), partyId: string | null = n
          WHERE l.group_id = ? AND l.group_epoch = ?
          ORDER BY CASE WHEN l.looted_at = '' THEN 1 ELSE 0 END, l.looted_at, l.created_at`,
       )
-      .all(party.id, party.session_epoch) as Array<{
+      .all(party.id, epoch) as Array<{
       id: string;
       item_name: string;
       quantity: number | bigint;
@@ -435,7 +480,7 @@ export function readParty(db: DatabaseSync = getDb(), partyId: string | null = n
          WHERE party_id = ? AND session_epoch = ?
          ORDER BY created_at`,
       )
-      .all(party.id, party.session_epoch) as Array<{
+      .all(party.id, epoch) as Array<{
       from_presence_id: string;
       to_presence_id: string;
       copper: number | bigint;
@@ -459,9 +504,10 @@ export function readParty(db: DatabaseSync = getDb(), partyId: string | null = n
     party: {
       id: party.id,
       name: party.name,
-      status: party.status === "open" ? "open" : "closed",
-      startedAt: party.started_at,
-      closedAt: party.closed_at,
+      status: pastPot ? "closed" : party.status === "open" ? "open" : "closed",
+      startedAt: pastPot?.startedAt ?? party.started_at,
+      closedAt: pastPot ? pastPot.closedAt : party.closed_at,
+      pot: pastPot ? pot : null,
       mode: party.mode === mode ? mode : null,
       presences,
     },
@@ -470,7 +516,7 @@ export function readParty(db: DatabaseSync = getDb(), partyId: string | null = n
     split: splitPot(lines, windows, mode, settlements),
     parties,
     gameParty:
-      party.status === "open"
+      party.status === "open" && !pastPot
         ? gamePartyProposals(readGameParty(db, gamePartyWindowStart(party.started_at)), {
             startedAt: party.started_at,
             presences,

@@ -52,7 +52,7 @@ import {
   writeStoredChatRoundStep,
 } from "@/lib/settlement-chat";
 import { ChatAnnounceWithRound } from "@/components/chat-round-toggle";
-import { GroupBar } from "@/components/group-switcher";
+import { GroupBar, parsePartyKey } from "@/components/group-switcher";
 import { MemberRail, RowIconButton } from "@/components/split-visuals";
 import type { GamePartyProposals } from "@/lib/game-party";
 import type { PartySummary } from "@/lib/group";
@@ -82,6 +82,8 @@ type PartyView = {
     status: "open" | "closed";
     startedAt: string;
     closedAt: string | null;
+    /** Set when viewing a past pot of the open group (read-only). */
+    pot?: number | null;
     mode: SplitMode | null;
     presences: PartyPresence[];
   };
@@ -744,7 +746,10 @@ export function GroupScreen() {
     setArchiveView(null);
     if (!partyId) return;
     try {
-      const next = await api<PartyView>(`/api/group?id=${encodeURIComponent(partyId)}`);
+      const { id, pot } = parsePartyKey(partyId);
+      const next = await api<PartyView>(
+        `/api/group?id=${encodeURIComponent(id)}${pot != null ? `&pot=${pot}` : ""}`,
+      );
       setArchiveView(next);
     } catch (caught) {
       setArchiveId(null);
@@ -859,7 +864,10 @@ export function GroupScreen() {
         >
           {party && view?.split ? (
             <MemberRail
-              members={settlementMembers(view.split.balances)}
+              // Departed members stay listed only while they still owe or are owed something.
+              members={settlementMembers(view.split.balances).filter(
+                (row) => row.leftAt == null || row.balanceCopper !== 0,
+              )}
               totalCopper={settlementMembers(view.split.balances).reduce((sum, row) => sum + row.lootedCopper, 0)}
               subtitle={
                 <>
@@ -1596,7 +1604,10 @@ function ArchivedGroup({ view, onBack }: { view: PartyView; onBack: () => void }
       <Alert>
         <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
           <span>
-            {copy.group.archivedNotice(stamp(party.startedAt), party.closedAt ? stamp(party.closedAt) : "—")}
+            {(party.pot != null ? copy.group.potNotice : copy.group.archivedNotice)(
+              stamp(party.startedAt),
+              party.closedAt ? stamp(party.closedAt) : "—",
+            )}
           </span>
           <Button type="button" variant="outline" size="sm" onClick={onBack}>
             {copy.group.backToActive}

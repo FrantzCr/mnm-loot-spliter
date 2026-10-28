@@ -8,8 +8,12 @@ export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   try {
-    const id = new URL(request.url).searchParams.get("id");
-    return Response.json(readParty(getDb(), id && id.length > 0 ? id : null));
+    const params = new URL(request.url).searchParams;
+    const id = params.get("id");
+    const pot = params.get("pot");
+    return Response.json(
+      readParty(getDb(), id && id.length > 0 ? id : null, pot && /^\d+$/.test(pot) ? Number(pot) : null),
+    );
   } catch (error) {
     return routeError(error);
   }

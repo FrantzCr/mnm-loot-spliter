@@ -16,6 +16,16 @@ export function partyLabel(
   return party.name?.trim() || defaultName(stamp(party.startedAt));
 }
 
+/** Switcher value: the group id, plus `~<pot>` for a past pot of the open group. */
+export function partyKey(party: Pick<PartySummary, "id" | "pot">): string {
+  return party.pot == null ? party.id : `${party.id}~${party.pot}`;
+}
+
+export function parsePartyKey(key: string): { id: string; pot: number | null } {
+  const [id, pot] = key.split("~");
+  return { id, pot: pot != null && /^\d+$/.test(pot) ? Number(pot) : null };
+}
+
 /**
  * Group header strip: current group's name (inline rename) and a switcher between the
  * active group and closed archives. Archives open read-only.
@@ -41,10 +51,13 @@ export function GroupBar({
   const [draft, setDraft] = useState("");
   // Older responses (or a server mid-upgrade) may omit the list: treat it as empty.
   const list = parties ?? [];
-  const shown = list.find((party) => party.id === shownId) ?? null;
+  const shown = list.find((party) => partyKey(party) === shownId) ?? null;
   const active = list.find((party) => party.status === "open") ?? null;
-  const archives = list.filter((party) => party.status === "closed");
+  const pots = list.filter((party) => party.pot != null);
+  const archives = list.filter((party) => party.status === "closed" && party.pot == null);
   const label = (party: PartySummary) => partyLabel(party, copy.group.defaultName, stamp);
+  const potLabel = (party: PartySummary) =>
+    copy.group.potLabel(stamp(party.startedAt), party.closedAt ? stamp(party.closedAt) : "—");
 
   async function submit() {
     if (!shown) return;
@@ -91,6 +104,11 @@ export function GroupBar({
               {copy.common.cancel}
             </Button>
           </form>
+        ) : shown?.pot != null ? (
+          // A past pot shares the group's name; rename from the group itself.
+          <h3 className="truncate font-heading text-lg">
+            {label(shown)} · {potLabel(shown)}
+          </h3>
         ) : shown ? (
           <>
             <h3 className="truncate font-heading text-lg">{label(shown)}</h3>
@@ -112,7 +130,7 @@ export function GroupBar({
         )}
       </div>
 
-      {archives.length > 0 ? (
+      {archives.length > 0 || pots.length > 0 ? (
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
           <span>{copy.group.switchLabel}</span>
           <select
@@ -124,13 +142,24 @@ export function GroupBar({
             className="h-8 max-w-64 rounded-sm border border-[#6e5338]/55 bg-card px-2 text-sm text-foreground"
           >
             <option value="">{active ? `${label(active)} · ${copy.group.activeSuffix}` : copy.group.noActiveGroup}</option>
-            <optgroup label={copy.group.archivesLabel(archives.length)}>
-              {archives.map((party) => (
-                <option key={party.id} value={party.id}>
-                  {label(party)} · {copy.group.lootSummary(party.lootCount)}
-                </option>
-              ))}
-            </optgroup>
+            {pots.length > 0 ? (
+              <optgroup label={copy.group.potsLabel(pots.length)}>
+                {pots.map((party) => (
+                  <option key={partyKey(party)} value={partyKey(party)}>
+                    {potLabel(party)} · {copy.group.lootSummary(party.lootCount)}
+                  </option>
+                ))}
+              </optgroup>
+            ) : null}
+            {archives.length > 0 ? (
+              <optgroup label={copy.group.archivesLabel(archives.length)}>
+                {archives.map((party) => (
+                  <option key={party.id} value={party.id}>
+                    {label(party)} · {copy.group.lootSummary(party.lootCount)}
+                  </option>
+                ))}
+              </optgroup>
+            ) : null}
           </select>
         </label>
       ) : null}

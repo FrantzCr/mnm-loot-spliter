@@ -136,3 +136,7 @@
 - Build: removed a file-tracing warning.
 
 **Reminder:** opening the app a second time focuses the existing window (since 0.2.0).
+
+## 0.2.2
+
+- **2026-10-28** — Group polish + pot history. Members rail: bars show surplus (right) / shortfall (left) in one yellow, amounts read + surplus (green) / − missing (red); departed members with nothing to settle are hidden. Reset pot: previous pots of the open group listed in **Show** under *Previous pots*, read-only (`readParty(db, id, pot)`, `/api/group?id=&pot=`). README: quick start, "How the split works", troubleshooting.

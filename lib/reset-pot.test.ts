@@ -62,6 +62,18 @@ describe("resetPot", () => {
       assert.equal(fresh.split?.transfers.length, 1);
       assert.equal(fresh.split?.transfers[0]?.copper, 50);
 
+      // The cleared pot stays readable from the switcher, with its late loot and its settlements.
+      const pots = fresh.parties.filter((party) => party.pot != null);
+      assert.equal(pots.length, 1);
+      assert.equal(pots[0]?.pot, 0);
+      assert.equal(pots[0]?.lootCount, 2);
+      const past = readParty(db, fresh.party?.id ?? null, 0);
+      assert.equal(past.party?.pot, 0);
+      assert.equal(past.party?.status, "closed");
+      assert.equal(past.lines.length, 2);
+      assert.equal(past.gameParty, null);
+      assert.throws(() => readParty(db, fresh.party?.id ?? null, 1), /group\.missing/);
+
       // Ledger history is untouched.
       const total = db.prepare("SELECT COUNT(*) AS n FROM loot_entries").get() as { n: number };
       assert.equal(Number(total.n), 3);

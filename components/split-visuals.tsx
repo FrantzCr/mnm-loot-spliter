@@ -107,7 +107,8 @@ export function MemberRail({
                       aria-hidden
                       className={cn(
                         "absolute inset-y-1.5 min-w-[3px]",
-                        gives ? "right-1/2 rounded-l-[3px] bg-[#9a2f1f]/45" : "left-1/2 rounded-r-[3px] bg-[#2f5d3a]/45",
+                        // Surplus over the fair share grows right, shortfall grows left.
+                        gives ? "left-1/2 rounded-r-[3px] bg-[#c9a227]/55" : "right-1/2 rounded-l-[3px] bg-[#c9a227]/55",
                       )}
                       style={{ width: `${width}%` }}
                     />
@@ -116,7 +117,7 @@ export function MemberRail({
                   <span
                     className={cn(
                       "absolute top-1/2 grid max-w-[calc(50%-0.5rem)] -translate-y-1/2 gap-0.5",
-                      gives ? "left-[calc(50%+0.4rem)] justify-items-start" : "right-[calc(50%+0.4rem)] justify-items-end text-right",
+                      gives ? "right-[calc(50%+0.4rem)] justify-items-end text-right" : "left-[calc(50%+0.4rem)] justify-items-start",
                     )}
                   >
                     <span className="max-w-full truncate font-heading text-[0.9375rem] leading-none text-foreground/90 [-webkit-text-stroke:0.15px_currentColor]">
@@ -133,10 +134,11 @@ export function MemberRail({
                   <span className="col-span-2 justify-self-end text-muted-foreground">{copy.group.balanceEven}</span>
                 ) : (
                   <>
-                    <span aria-hidden className={cn("font-mono opacity-80", gives ? GIVE : RECEIVE)}>
-                      {gives ? "−" : "+"}
+                    {/* Sign reads from the member's side: + surplus over the share, − missing. */}
+                    <span aria-hidden className={cn("font-mono opacity-80", gives ? RECEIVE : GIVE)}>
+                      {gives ? "+" : "−"}
                     </span>
-                    <span className={cn("justify-self-end opacity-80", gives ? GIVE : RECEIVE)}>
+                    <span className={cn("justify-self-end opacity-80", gives ? RECEIVE : GIVE)}>
                       <span className="sr-only">{gives ? copy.group.balanceGives : copy.group.balanceReceives}</span>
                       <CoinAmount copper={Math.abs(row.balanceCopper)} columns={coinColumns} />
                     </span>
