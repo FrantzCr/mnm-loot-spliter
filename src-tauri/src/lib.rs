@@ -338,6 +338,11 @@ fn install_update_blocking(app: &AppHandle, url: &str, file_name: &str) -> Resul
 
   download_https_file(url, &dest)?;
 
+  // Stop the bundled Node first: NSIS cannot overwrite resources/register/node.exe while it runs.
+  // A register reused from an earlier launch is not our child, so also clear the port.
+  stop_sidecar(&app.state::<SidecarState>());
+  kill_stale_register_listeners(PACKAGED_REGISTER_PORT);
+
   let mut command = Command::new(&dest);
   // Tauri NSIS: update mode skips some first-run prompts and replaces in place.
   command.arg("/UPDATE");
@@ -464,6 +469,12 @@ pub fn run() {
     });
 
   builder
-    .run(tauri::generate_context!())
-    .expect("error while building tauri application");
+    .build(tauri::generate_context!())
+    .expect("error while building tauri application")
+    .run(|app, event| {
+      // app.exit() skips window Destroyed events: stop the sidecar on every exit path.
+      if let tauri::RunEvent::Exit = event {
+        stop_sidecar(&app.state::<SidecarState>());
+      }
+    });
 }
